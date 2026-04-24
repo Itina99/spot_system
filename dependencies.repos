@@ -1,0 +1,10 @@
+repositories:
+  spot_gazebo_ros2:
+    type: git
+    url: https://github.com/justyx404/spot_gazebo_ros2.git
+    version: main
+
+  spot_exploration:
+    type: git
+    url: https://github.com/Itina99/spotSDK-autonomousMission.git
+    version: main
