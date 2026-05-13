@@ -1,0 +1,1 @@
+""" Implementazione concreta di RobotInterface"""
