@@ -114,12 +114,6 @@ class SDKMovementProvider(MovementProvider):
             print(f"[SDKMovementProvider] Error moving forward: {e}")
             return False
 
-    def move_to(self, target_x:float, target_y:float, target_z:float ) -> bool:
-        """questo va levato da controllare se effettivamente esiste"""
-        raise NotImplementedError(
-            "SDK non supporta move_to() diretto. "
-            "L'algoritmo deve usare get_position() + rotate_by() + move_forward()"
-        )
 
 class SDKVisualizerProvider(VisualizerProvider):
     def __init__(self, mission_folder: Optional[str] = None):
