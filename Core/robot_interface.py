@@ -99,7 +99,7 @@ class MovementProvider(ABC):
         pass
 
     @abstractmethod
-    def move_to(self, target_x: float, target_y: float) -> bool:
+    def move_to(self, target_x: float, target_y: float, target_z:float) -> bool:
         """
         Muove il robot verso coordinate assolute (x, y).
         Per SDK potrebbe non essere direttamente supportato (usare rotate + move_forward).

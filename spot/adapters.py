@@ -7,7 +7,7 @@ import numpy as np
 import os
 import time
 
-from core.interfaces import (LocalGridProvider,StateProvider,MovementProvider,VisualizerProvider,RecordingProvider)
+from Core.robot_interface import (LocalGridProvider,StateProvider,MovementProvider,VisualizerProvider,RecordingProvider)
 
 
 # --- Import SDK Spot ---

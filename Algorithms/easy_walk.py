@@ -8,7 +8,7 @@ from Core.robot_interface import (LocalGridProvider, StateProvider, MovementProv
 from environment_map import EnvironmentMap
 
 ## Dependency Injection: passiamo i provider come argomenti alla funzione principale invece di importarli direttamente, in modo da poterli sostituire facilmente per test o implementazioni diverse.
-from core.interfaces import LocalGridProvider, StateProvider, MovementProvider, VisualizerProvider, RecordingProvider
+from Core.robot_interface import LocalGridProvider, StateProvider, MovementProvider, VisualizerProvider, RecordingProvider
 
 
 def attempt_enter_cell_from_position(providers: Dict[str, Any], env: 'EnvironmentMap', target_row:int, target_col:int, iteration: int = 0,) -> bool:
