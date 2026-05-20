@@ -107,7 +107,6 @@ def main():
     options.recording_user_name = ""
     options.recording_session_name = ""
     options.download_filepath = os.getcwd()
-    print("QUI C'È")
     try:
         robot, lease_client, robot_state_client, client_metadata, recording_interface, estop = setup_spot(options)
         with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=True):
