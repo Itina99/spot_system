@@ -107,7 +107,7 @@ def main():
     options.recording_user_name = ""
     options.recording_session_name = ""
     options.download_filepath = os.getcwd()
-
+    print("QUI C'È")
     try:
         robot, lease_client, robot_state_client, client_metadata, recording_interface, estop = setup_spot(options)
         with bosdyn.client.lease.LeaseKeepAlive(lease_client, must_acquire=True, return_at_exit=True):
@@ -132,12 +132,12 @@ def main():
             start_row, start_col = 0,0
             recording_interface.create_default_waypoint(cell_row=start_row, cell_col=start_col)
 
-            env = environment_map.EnvironmentMap(rows=5, cols=17, cell_size=2)
+            env = environment_map.EnvironmentMap(rows=3, cols=3, cell_size=2)
             x_boot, y_boot, z_boot, quat_boot = spot_utils.getPosition(robot_state_client)
 
             yaw_boot = np.arctan2(2.0 * (quat_boot.w * quat_boot.z + quat_boot.x * quat_boot.y),
                               1.0 - 2.0 * (quat_boot.y ** 2 + quat_boot.z ** 2))
-            env.set_origin(x_boot, y_boot, z_boot, start_row=start_row, start_col=start_col)
+            env.set_origin(x_boot, y_boot, yaw_boot, start_row=start_row, start_col=start_col)
             print(f'[INIT] Boot position: x={x_boot:.3f}, y={y_boot:.3f}, z={z_boot:.3f}')
             print(
                 f'[INIT] Boot orientation: reale {np.rad2deg(yaw_boot):.1f}° -> allineata alla griglia: {np.rad2deg(yaw_boot):.1f}°')
@@ -150,11 +150,11 @@ def main():
 
             #===== CREATING ADAPTERS =====#
             providers = {
-                'local_grid': SDKLocalGridProvider(local_grid_client, robot_state_client),
+                'local_grid': SDKLocalGridProvider(robot_state_client, local_grid_client),
                 'state': SDKStateProvider(robot_state_client),
                 'movement': SDKMovementProvider(command_client, robot_state_client),
                 'visualizer': SDKVisualizerProvider(mission_folder),
-                'recording': SDKRecordingProvider(recording_interface),
+                'recording': SDKRecordingProvider(recording_interface, robot_state_client),
             }
 
             exploration_main_loop(
@@ -173,7 +173,23 @@ def main():
 
         return True
     except Exception as exc:
+        import traceback
+        print(f"\n{'='*70}")
+        print(f"[ERROR] Exception occurred in main:")
+        print(f"{'='*70}")
+        traceback.print_exc()
+        print(f"{'='*70}\n")
         logger = bosdyn.client.util.get_logger()
         logger.error('Spot threw an exception: %r', exc)
         return False
 
+
+if __name__ == "__main__":
+    print("[START] Spot SDK Exploration - Starting main loop")
+    success = main()
+    if success:
+        print("[SUCCESS] Exploration completed successfully")
+        sys.exit(0)
+    else:
+        print("[FAILURE] Exploration failed")
+        sys.exit(1)

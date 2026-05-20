@@ -53,9 +53,8 @@ class SDKStateProvider(StateProvider):
     def get_position(self)->Tuple[float, float, float]:
         try:
             robot_state = self.robot_state_client.get_robot_state()
-            transform = robot_state.kinematic_state.tramsforms_snapshot
-
-            vision_tform_body = get_a_tform_b(transform, VISION_FRAME_NAME, BODY_FRAME_NAME)
+            transforms_snapshot = robot_state.kinematic_state.transforms_snapshot
+            vision_tform_body = get_a_tform_b(transforms_snapshot, VISION_FRAME_NAME, BODY_FRAME_NAME)
 
             return vision_tform_body.position.x, vision_tform_body.position.y, vision_tform_body.position.z
 
@@ -66,7 +65,7 @@ class SDKStateProvider(StateProvider):
     def get_yaw(self) -> float:
         try:
             robot_state = self.robot_state_client.get_robot_state()
-            transforms = robot_state.kinematic_state.tramsforms_snapshot
+            transforms = robot_state.kinematic_state.transforms_snapshot
 
             vision_tform_body = get_a_tform_b(transforms, VISION_FRAME_NAME, BODY_FRAME_NAME)
 
@@ -82,7 +81,7 @@ class SDKStateProvider(StateProvider):
     def get_quaternion(self) -> Any:
         try:
             robot_state = self.robot_state_client.get_robot_state()
-            transforms = robot_state.kinematic_state.tramsforms_snapshot
+            transforms = robot_state.kinematic_state.transforms_snapshot
 
             vision_tform_body = get_a_tform_b(transforms, VISION_FRAME_NAME, BODY_FRAME_NAME)
 
@@ -114,14 +113,13 @@ class SDKMovementProvider(MovementProvider):
             print(f"[SDKMovementProvider] Error moving forward: {e}")
             return False
 
-
 class SDKVisualizerProvider(VisualizerProvider):
     def __init__(self, mission_folder: Optional[str] = None):
         self.mission_folder = mission_folder
 
     def visualize_iteration(self, pts:np.ndarray, cells_obstacle_dist:np.ndarray,robot_x:float, robot_y:float,candidates: Dict[str, List[Tuple[float,float]]], chosen_point: Optional[Tuple[float,float]], iteration:int, env: Any) -> None:
         try:
-            from spot import visualize_grid_with_candidates
+            from spot.visualization import visualize_grid_with_candidates
 
             save_path = None
             if self.mission_folder:
@@ -132,10 +130,11 @@ class SDKVisualizerProvider(VisualizerProvider):
 
 class SDKRecordingProvider(RecordingProvider):
 
-    def __init__(self, recording_interface: Any):
+    def __init__(self, recording_interface: Any, robot_state_client: Any):
         self.recording_interface = recording_interface
+        self.robot_state_client = robot_state_client
 
-    def create_waypoint(self, cell_row: int, cell_col: int, x: float, y:float, z:float, yaw: float) -> bool:
+    def create_waypoint(self, cell_row: int, cell_col: int) -> bool:
 
         try:
 
@@ -157,30 +156,48 @@ class SDKRecordingProvider(RecordingProvider):
             print(f"[SDKRecordingProvider] Error getting waypoints: {e}")
             return {}
 
-    def find_nearest_waypoint_to_target(self, target_cell: Tuple[float,float])->Optional[Tuple[int, int]]:
+    def find_nearest_waypoint_to_target(self, target_cell: Tuple[int, int], env=None) ->Optional[Tuple[int, int]]:
         try:
             waypoints = self.get_all_waypoints()
-
-            nearest = None
-            min_distance = float("inf")
-
-            for wp_name, wp_data in waypoints.items():
-                if 'cell_row' in wp_data and 'cell_col' in wp_data:
-                    wp_cell = (wp_data['cell_row'], wp_data['cell_col'])
-                    distance = np.sqrt(
-                        (wp_cell[0] - target_cell[0]) ** 2 +
-                        (wp_cell[1] - target_cell[1]) ** 2
-                    )
-
-                    if distance < min_distance:
-                        min_distance = distance
-                        nearest = wp_cell
-
-            return nearest
+            nearest_cell = self.recording_interface.find_nearest_waypoint_cell_to_target(target_cell=target_cell,waypoints_by_cell=waypoints ,env_map=env)
+            return nearest_cell
 
         except Exception as e:
             print(f"[SDKRecordingProvider] Error finding nearest waypoint: {e}")
             return None
+
+    def get_manual_waypoint_by_cell(self, cell: Tuple[int, int]) -> Any | None:
+        try:
+            waypoint = self.recording_interface.get_manual_waypoint_by_cell(cell[0], cell[1])
+            print(f"[SDKRecordingProvider] Waypoint for cell {cell}: {waypoint}")
+            return waypoint
+        except Exception as e:
+            print(f"[SDKRecordingProvider] Error getting manual waypoint: {e}")
+            return None
+
+    def stop_recording(self) -> None:
+        try:
+            self.recording_interface.stop_recording()
+
+        except Exception as e:
+            print(f"[SDKRecordingProvider] Error stop recording: {e}")
+
+    def start_recording(self) -> None:
+        try:
+            self.recording_interface.start_recording()
+        except Exception as e:
+            print(f"[SDKRecordingProvider] Error start recording: {e}")
+
+    def navigate_to_waypoint(self, waypoint_id) -> bool:
+        try:
+            success = self.recording_interface.navigate_to_waypoint(waypoint_id, self.robot_state_client)
+            return success
+        except Exception as e:
+            print(f"[SDKRecordingProvider] Error navigating to waypoint: {e}")
+            return False
+
+
+
 
 
 

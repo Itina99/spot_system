@@ -98,7 +98,6 @@ class MovementProvider(ABC):
         """
         pass
 
-
 class VisualizerProvider(ABC):
     @abstractmethod
     def visualize_iteration(
@@ -134,15 +133,7 @@ class RecordingProvider(ABC):
         """
 
     @abstractmethod
-    def create_waypoint(
-            self,
-            cell_row: int,
-            cell_col: int,
-            x: float,
-            y: float,
-            z: float,
-            yaw: float
-    ) -> bool:
+    def create_waypoint(self, cell_row: int, cell_col: int) -> bool:
         """
         Crea un waypoint nella posizione specificata.
 
@@ -170,10 +161,7 @@ class RecordingProvider(ABC):
         pass
 
     @abstractmethod
-    def find_nearest_waypoint_to_target(
-            self,
-            target_cell: Tuple[int, int]
-    ) -> Optional[Tuple[int, int]]:
+    def find_nearest_waypoint_to_target(self, target_cell: Tuple[int, int],env: Any = None) -> Optional[Tuple[int, int]]:
         """
         Trova il waypoint più vicino a una cella target.
 
@@ -182,5 +170,34 @@ class RecordingProvider(ABC):
 
         Returns:
             Optional[Tuple[int, int]]: (row, col) del waypoint più vicino, o None
+            :param target_cell:
+            :param env:
+        """
+        pass
+
+    @abstractmethod
+    def get_manual_waypoint_by_cell(self, cell: Tuple[int, int]) -> Optional[Tuple[int, int]]:
+        pass
+
+    @abstractmethod
+    def stop_recording(self) -> None:
+        """
+        Ferma il processo di registrazione (se applicabile).
+        """
+        pass
+
+    @abstractmethod
+    def start_recording(self) -> None:
+        pass
+
+    def navigate_to_waypoint(self, waypoint_id:Any) -> bool:
+        """
+        Naviga verso un waypoint specificato.
+
+        Args:
+            waypoint_id: Identificatore del waypoint (formato dipendente dalla piattaforma)
+
+        Returns:
+            bool: True se navigazione completata, False se fallita
         """
         pass

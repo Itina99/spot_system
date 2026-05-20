@@ -294,7 +294,6 @@ class RecordingInterface(object):
         from_T_to = from_tf.mult(to_tf.inverse())
         return from_T_to.to_proto()
 
-
     def should_we_start_recording(self):
         graph = self._get_graph()
         if graph is not None:
@@ -393,12 +392,12 @@ class RecordingInterface(object):
         import sys
         import os
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        import spotUtils
+        import spot_utils
         import numpy as np
 
         # Get current robot position
         robot_state_client = self.robot.ensure_client('robot-state')
-        x, y, z, quat = spotUtils.getPosition(robot_state_client)
+        x, y, z, quat = spot_utils.getPosition(robot_state_client)
 
         # Calculate yaw from quaternion
         yaw = np.arctan2(

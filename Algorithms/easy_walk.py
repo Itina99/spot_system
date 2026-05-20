@@ -4,11 +4,10 @@ from typing import Dict, List, Tuple, Any, Optional
 import time
 import numpy as np
 
-from Algorithms.utils.exploration_utils import find_new_borders
 from Core.robot_interface import (LocalGridProvider, StateProvider, MovementProvider, VisualizerProvider, RecordingProvider)
-from environment_map import EnvironmentMap
+from Algorithms.environment_map import EnvironmentMap
 
-from utils.exploration_utils import find_new_borders, find_best_point_in_cell
+from Algorithms.utils.exploration_utils import find_new_borders, find_best_point_in_cell
 
 ## Dependency Injection: passiamo i provider come argomenti alla funzione principale invece di importarli direttamente, in modo da poterli sostituire facilmente per test o implementazioni diverse.
 from Core.robot_interface import LocalGridProvider, StateProvider, MovementProvider, VisualizerProvider, RecordingProvider
@@ -66,11 +65,6 @@ def attempt_enter_cell_from_position(providers: Dict[str, Any], env: 'Environmen
         print("[FAIL] Rotation failed")
         return False
 
-    print(f"[INFO] Step 2: Moving to target ({target_x:.2f}, {target_y:.2f})...")
-    if not movement_provider.move_to(target_x, target_y):
-        print("[FAIL] Movement failed")
-        return False
-
     time.sleep(0.5)
 
     print(f"[INFO] Step 2: Moving forward {distance:.2f}m...")
@@ -90,31 +84,18 @@ def attempt_enter_cell_from_position(providers: Dict[str, Any], env: 'Environmen
         print(f"[FAIL] Robot ended in wrong cell")
         return False
 
-
-
-
-
-
-
-
-
-
-
 def exploration_main_loop(providers: Dict[str, Any], env: EnvironmentMap, path: List[Tuple[int, int]]):
 
 
-    local_grid_provider = providers['local_grid']
     state_provider = providers['state']
-    movement_provider = providers['movement']
-    visualizer = providers['visualizer']
     recording = providers['recording']
 
     frontier = []
     current_path_index = 0
     visualization_counter = 0
 
-    x,y,z,_ = state_provider.get_position()
-    robot_row, robot_col, _ = env.get_cell_from_world(x, y)
+    x,y,z = state_provider.get_position()
+    robot_row, robot_col = env.get_cell_from_world(x, y)
     frontier.extend(find_new_borders(env, robot_row, robot_col, path, frontier))
     while True :
         print(frontier)
@@ -122,8 +103,8 @@ def exploration_main_loop(providers: Dict[str, Any], env: EnvironmentMap, path: 
         print(f"### PATH STEP: {current_path_index + 1}/{len(path)} ###")
         print(f"{'#' * 70}\n")
 
-        x, y, z, _ = state_provider.get_position()
-        robot_row, robot_col, _ = env.get_cell_from_world(x, y)
+        x, y, z = state_provider.get_position()
+        robot_row, robot_col = env.get_cell_from_world(x, y)
 
         borders = env.get_adjacent_frontier_cells(robot_row, robot_col, path)
         borders_in_frontier = []
@@ -136,6 +117,7 @@ def exploration_main_loop(providers: Dict[str, Any], env: EnvironmentMap, path: 
             break
 
         if len(borders_in_frontier) != 0:
+            # ===== CASE 1: Adjacent border available =====
             selected_border = min(borders_in_frontier, key = lambda b:b[2])
             print(f"[BORDER] Selected border from frontier: ({selected_border[0]},{selected_border[1]}) rank={selected_border[2]}")
 
@@ -143,13 +125,74 @@ def exploration_main_loop(providers: Dict[str, Any], env: EnvironmentMap, path: 
 
             visualization_counter += 1
 
+            # CRITICAL: Remove ALWAYS before checking result (aligned with old version)
+            frontier.remove(selected_border)
+
             if check:
                 env.update_position(x, y)
                 env.print_map()
 
-                recording.create_default_waypoint(selected_border[0], selected_border[1])
+                recording.create_waypoint(selected_border[0], selected_border[1])
+                env.add_waypoint(x,y)
+                env.mark_cell_visited(selected_border[0], selected_border[1])
+                x_new, y_new, z_new = state_provider.get_position()
+                robot_row, robot_col = env.get_cell_from_world(x_new, y_new)
+                frontier.extend(find_new_borders(env, robot_row, robot_col, path, frontier))
+            else:
+                print(f"[FAIL] Could not enter border cell ({selected_border[0]},{selected_border[1]}) from current position")
+                # Border is already removed, continue to next iteration
+        else:
+            # ===== CASE 2: NO adjacent borders - try fallback navigation to lowest rank cell =====
+            lowest_rank_cell = env.get_lowest_rank_from_frontier_list(frontier, path)
 
+            if lowest_rank_cell is not None:
+                target_row, target_col, rank = lowest_rank_cell
+                print(f"\n[TARGET] Cell with lowest rank from frontier: ({target_row},{target_col}) rank={rank}")
 
+                x_current, y_current,_ = state_provider.get_position()
+                current_row, current_col = env.get_cell_from_world(x_current, y_current)
+
+                print(f"\n[PATH_OPTIMIZE] Finding optimized path from ({current_row},{current_col}) to ({target_row},{target_col})")
+
+                recording.stop_recording()
+
+                target_cell = (target_row, target_col)
+
+                nearest_cell = recording.find_nearest_waypoint_to_target(target_cell, env)
+                nearest_wp = recording.get_manual_waypoint_by_cell(nearest_cell)
+
+                navigation_success = recording.navigate_to_waypoint(nearest_wp['id'])
+
+                if navigation_success:
+                    recording.start_recording()
+
+                    check = attempt_enter_cell_from_position(providers, env, target_cell[0], target_cell[1])
+                    visualization_counter += 1
+
+                    if check:
+                        x_final, y_final, z_final = state_provider.get_position()
+                        recording.create_waypoint(target_cell[0], target_cell[1])
+                        env.add_waypoint(x_final, y_final)
+
+                        env.mark_cell_visited(target_cell[0], target_cell[1])
+
+                        robot_row, robot_col= env.get_cell_from_world(x_final, y_final)
+                        frontier.extend(find_new_borders(env, robot_row, robot_col, path, frontier))
+
+                        print(f"[SUCCESS] Entered cell ({target_row},{target_col}) via optimized path")
+                    else:
+                        print(f"[FAIL] Failed to enter cell ({target_row},{target_col}) via optimized path")
+
+                    # Remove from frontier after attempt (success or failure)
+                    frontier.remove((target_row, target_col, rank))
+                else:
+                    print(f"[ERROR] Navigation failed along optimized path")
+                    recording.start_recording()
+                    # Remove from frontier even on navigation failure
+                    frontier.remove((target_row, target_col, rank))
+            else:
+                print(f"[ERROR] No frontier cells available to explore")
+                break
 
 
     return True

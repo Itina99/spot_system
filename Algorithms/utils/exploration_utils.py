@@ -1,6 +1,6 @@
 import numpy as np
-from cell_sampling import sample_cell_points
-from line_of_sight import check_line_of_sight
+from Algorithms.utils.cell_sampling import sample_cell_points
+from Algorithms.utils.line_of_sight import check_line_of_sight
 
 
 def find_new_borders(env, robot_row, robot_col, path, frontier):
