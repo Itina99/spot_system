@@ -20,7 +20,7 @@ from spot_ros.adapters import ROSLocalGridProvider, ROSStateProvider, ROSMovemen
 from Algorithms.easy_walk import exploration_main_loop
 from Algorithms import environment_map
 
-from spot_ros import spot_grid_ros, nav_graph_utils_ros, spot_utils_ros, movements_ros
+from spot_ros import nav_graph_utils_ros, spot_utils_ros, movements_ros
 from spot_ros.static_grid_loader import load_static_grid
 from spot_ros.local_distance import LocalDistanceField
 
@@ -195,7 +195,7 @@ def main():
         mission_folder, graph_folder, mission_log_file = folders_setup()
         env = environment_map.EnvironmentMap(rows=node.get_parameter('grid_rows').value, cols=node.get_parameter('grid_cols').value, cell_size=node.get_parameter('cell_size').value,)
 
-        x_boot, y_boot, z_boot, _ = spot_utils_ros.getPosition(node.pos_state)
+        x_boot, y_boot, z_boot, _ = spot_utils_ros.getPosition(node.pose_state)
         yaw_boot = node.pose_state.yaw()
 
         env.set_origin(x_boot, y_boot, yaw_boot, start_row=0, start_col=0)
@@ -209,12 +209,11 @@ def main():
         path = env.generate_serpentine_path(start_cell=env.start_cell)
 
         providers = {
-            'local_grid' :ROSLocalGridProvider(),
-            'state': ROSStateProvider(),
-            'movement': ROSMovementProvider(),
+            'local_grid': ROSLocalGridProvider(occupancy_grid_msg=node.current_map, occupied_threshold=int(node.get_parameter('occupied_threshold').value)),
+            'state': ROSStateProvider(pose_state=node.pose_state),
+            'movement': ROSMovementProvider(motion_controller=node.motion),
             'visualizer': ROSVisualizerProvider(),
-            'recording': ROSRecordingProvider(recording_interface),
-
+            'recording': ROSRecordingProvider(recording_interface=recording_interface, motion_controller=node.motion, pose_state=node.pose_state),
         }
 
         exploration_main_loop(providers=providers, env=env, path=path)

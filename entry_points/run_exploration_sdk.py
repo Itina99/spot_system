@@ -20,8 +20,8 @@ from bosdyn.client.local_grid import LocalGridClient
 
 from Algorithms import environment_map
 
-from spot import spot_log_in_utils, nav_graph_utils, spot_utils
-from spot.adapters import SDKLocalGridProvider, SDKStateProvider, SDKMovementProvider, SDKVisualizerProvider, SDKRecordingProvider
+from spot_sdk import spot_log_in_utils, nav_graph_utils, spot_utils
+from spot_sdk.adapters import SDKLocalGridProvider, SDKStateProvider, SDKMovementProvider, SDKVisualizerProvider, SDKRecordingProvider
 from Algorithms.easy_walk import exploration_main_loop
 from types import SimpleNamespace
 

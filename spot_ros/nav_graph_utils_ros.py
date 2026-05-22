@@ -3,7 +3,8 @@
 These keep the EasyWalk flow running in simulation without GraphNav.
 """
 from dataclasses import dataclass
-
+import time
+from time import sleep
 
 @dataclass
 class Waypoint:
@@ -78,8 +79,39 @@ class RecordingInterface:
                 best_cell = (row, col)
         return best_cell
 
-    def navigate_to_waypoint(self, *args, **kwargs):
-        return True
+    def navigate_to_waypoint(self, waypoint_id:str, motion_controller = None, max_retries: int = 3, timeout: int = 30):
+
+        target_waypoint = None
+        for wp in self.waypoints:
+            if wp.name == waypoint_id:
+                target_waypoint = wp
+                break
+        if target_waypoint is None:
+            print(f"[NAV_ROS] ✗ Waypoint '{waypoint_id}' not found in {[wp.name for wp in self.waypoints]}")
+            return False
+        print(
+            f"\n[NAV_ROS] Navigazione verso {target_waypoint.name} a ({target_waypoint.x:.2f}, {target_waypoint.y:.2f})...")
+        for attempt in range(1, max_retries + 1):
+            print(f"[NAV_ROS] Tentativo {attempt}/{max_retries}...")
+            try:
+                success = motion_controller.move_to(target_waypoint.x,target_waypoint.y,timeout=timeout)
+                if success:
+                    print(f"[NAV_ROS] ✓ Arrived at {target_waypoint.name}")
+                    return True
+                else:
+                    print(f"[NAV_ROS] Navigation failed, retry {attempt}/{max_retries}...")
+                    time.sleep(1.0)
+
+            except Exception as e:
+                print(f"[NAV_ROS] ✗ Exception during navigation: {e}")
+                if attempt < max_retries:
+                    time.sleep(1.0)
+                    continue
+                else:
+                    return False
+
+        print(f"[NAV_ROS] ✗ Failed to reach waypoint after {max_retries} attempts")
+        return False
 
     def auto_close_loops(self, *args, **kwargs):
         return True

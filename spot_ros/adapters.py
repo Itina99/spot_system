@@ -14,8 +14,6 @@ from std_msgs.msg import ColorRGBA
 from spot_ros.obstacle_grid import ObstacleGrid
 from spot_ros import spot_utils_ros, nav_graph_utils_ros
 
-
-
 class ROSLocalGridProvider(LocalGridProvider):
     def __init__(self, occupancy_grid_msg: Optional[OccupancyGrid] = None, occupied_threshold: int = 65):
 
@@ -60,26 +58,58 @@ class ROSLocalGridProvider(LocalGridProvider):
         return pts, cells, color
 
 class ROSStateProvider(StateProvider):
-    def __init__(self):
-        pass
-    def get_position(self):
-        pass
+    def __init__(self, pose_state):
+        self.pose_state = pose_state
 
-    def get_yaw(self):
-        pass
+    def get_position(self) -> Tuple[float, float, float]:
 
-    def get_quaternion(self):
-        pass
+        try:
+            return self.pose_state.x, self.pose_state.y, self.pose_state.z
+        except Exception as e:
+            print(f"[ROSStateProvider] Error getting position: {e}")
+            raise
+
+    def get_yaw(self) -> float:
+        try:
+            return self.pose_state.yaw()
+        except Exception as e:
+            print(f"[ROSStateProvider] Error getting yaw: {e}")
+            raise
+
+    def get_quaternion(self) -> Dict[str, float]:
+        try:
+            return {
+                'x': self.pose_state.qx,
+                'y': self.pose_state.qy,
+                'z': self.pose_state.qz,
+                'w': self.pose_state.qw
+            }
+        except Exception as e:
+            print(f"[ROSStateProvider] Error getting quaternion: {e}")
+            raise
 
 class ROSMovementProvider(MovementProvider):
-    def __init__(self):
-        pass
+    def __init__(self, motion_controller):
+
+        self.motion_controller = motion_controller
 
     def rotate_by(self, dyaw: float) -> bool:
-        pass
+
+        try:
+            success = self.motion_controller.rotate_by(dyaw)
+            return success
+        except Exception as e:
+            print(f"[ROSMovementProvider] Error rotating: {e}")
+            return False
 
     def move_forward(self, distance: float) -> bool:
-        pass
+
+        try:
+            success = self.motion_controller.move_forward(distance)
+            return success
+        except Exception as e:
+            print(f"[ROSMovementProvider] Error moving forward: {e}")
+            return False
 
 class ROSVisualizerProvider(VisualizerProvider):
     def __init__(self):
@@ -88,29 +118,67 @@ class ROSVisualizerProvider(VisualizerProvider):
         pass
 
 class ROSRecordingProvider(RecordingProvider):
-    def __init__(self):
-        pass
+    def __init__(self, recording_interface, motion_controller, pose_state):
+
+        self.recording_interface = recording_interface
+        self.motion_controller = motion_controller
+        self.pose_state = pose_state
 
     def create_waypoint(self, cell_row: int, cell_col: int) -> bool:
-        pass
+
+        try:
+            response = self.recording_interface.create_default_waypoint(cell_row, cell_col)
+            return response is not False and response is not None
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error creating waypoint: {e}")
+            return False
 
     def get_all_waypoints(self) -> Dict[str, Dict[str, Any]]:
-        pass
+        try:
+            waypoints = self.recording_interface.get_all_manual_waypoints_with_cells()
+            return waypoints if waypoints else {}
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error getting waypoints: {e}")
+            return {}
 
     def find_nearest_waypoint_to_target(self, target_cell: Tuple[int, int],env: Any = None) -> Optional[Tuple[int, int]]:
-        pass
+
+        try:
+            waypoints = self.get_all_waypoints()
+            nearest_cell= self.recording_interface.find_nearest_waypoint_cell_to_target(target_cell=target_cell, waypoints_by_cell=waypoints, env_map=env)
+            return nearest_cell if nearest_cell else None
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error finding nearest waypoint: {e}")
+            return None
 
     def get_manual_waypoint_by_cell(self, cell: Tuple[int, int]) -> Optional[Tuple[int, int]]:
-        pass
+        try:
+            waypoint = self.recording_interface.get_manual_waypoint_by_cell(cell[0], cell[1])
+            return waypoint if waypoint else None
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error getting waypoint: {e}")
+            return None
 
     def stop_recording(self) -> None:
-        pass
+
+        try:
+            self.recording_interface.stop_recording()
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error stopping recording: {e}")
 
     def start_recording(self) -> None:
-        pass
+        try:
+            self.recording_interface.start_recording()
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error starting recording: {e}")
 
     def navigate_to_waypoint(self, waypoint_id:Any) -> bool:
-        pass
+        try:
+            success = self.recording_interface.navigate_to_waypoint(waypoint_id, motion_controller=self.motion_controller)
+            return success
+        except Exception as e:
+            print(f"[ROSRecordingProvider] Error navigating to waypoint: {e}")
+            return False
 
 
 

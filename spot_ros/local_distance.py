@@ -32,7 +32,7 @@ class LocalDistanceField:
         )
 
     def update_from_occupancy_msg(self, msg):
-        """Update from /spot/local_grid ROS message (optional, for debugging)."""
+        """Update from /spot_sdk/local_grid ROS message (optional, for debugging)."""
         # Can be called but grid is primarily static
         pass
 

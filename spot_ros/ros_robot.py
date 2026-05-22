@@ -1,1 +1,0 @@
-"""Concrete Robot implementation for ROS."""

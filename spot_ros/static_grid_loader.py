@@ -25,7 +25,7 @@ class StaticGridCache:
 
 def load_static_grid(sdf_path: str) -> StaticGridCache:
     """Load SDF and build occupancy grid. Called once at startup."""
-    ignore = ["ground_plane", "spot"]
+    ignore = ["ground_plane", "spot_sdk"]
     obstacles = parse_sdf_obstacles(sdf_path, ignore)
     grid_range = calculate_grid_range(obstacles)
     spec = GridSpec(size=60, grid_range=grid_range)

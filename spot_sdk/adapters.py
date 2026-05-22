@@ -17,8 +17,8 @@ from bosdyn.client.local_grid import LocalGridClient
 from bosdyn.client.robot_command import RobotCommandClient
 
 # --- Import moduli privati Spot ---
-from spot import spot_grid
-from spot import movements
+from spot_sdk import spot_grid
+from spot_sdk import movements
 
 
 class SDKLocalGridProvider(LocalGridProvider):
@@ -119,7 +119,7 @@ class SDKVisualizerProvider(VisualizerProvider):
 
     def visualize_iteration(self, pts:np.ndarray, cells_obstacle_dist:np.ndarray,robot_x:float, robot_y:float,candidates: Dict[str, List[Tuple[float,float]]], chosen_point: Optional[Tuple[float,float]], iteration:int, env: Any) -> None:
         try:
-            from spot.visualization import visualize_grid_with_candidates
+            from spot_sdk.visualization import visualize_grid_with_candidates
 
             save_path = None
             if self.mission_folder:
