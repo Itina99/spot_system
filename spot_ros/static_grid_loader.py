@@ -8,8 +8,8 @@ import os
 # Import tools module
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 
-from sdf_static_grid import parse_sdf_obstacles, GridSpec, build_occupancy_grid
-from visualize_grid import calculate_grid_range
+from spot_ros.sdf_static_grid import parse_sdf_obstacles, GridSpec, build_occupancy_grid
+
 
 
 @dataclass
@@ -22,6 +22,24 @@ class StaticGridCache:
     origin_x: float
     origin_y: float
 
+def calculate_grid_range(obstacles):
+    """Calculate optimal grid range to fit all obstacles with 20% margin."""
+    if not obstacles:
+        return 3.0
+
+    xs = [obs.x for obs in obstacles]
+    ys = [obs.y for obs in obstacles]
+
+    max_x = max(abs(min(xs)), abs(max(xs)))
+    max_y = max(abs(min(ys)), abs(max(ys)))
+    needed_range = max(max_x, max_y)
+
+    # Add 20% margin and round up to nearest 0.5
+    margin = needed_range * 0.2
+    required = needed_range + margin
+    rounded = ((required // 0.5) + 1) * 0.5
+
+    return rounded
 
 def load_static_grid(sdf_path: str) -> StaticGridCache:
     """Load SDF and build occupancy grid. Called once at startup."""

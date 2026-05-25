@@ -1,8 +1,16 @@
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction
+from launch.actions import ExecuteProcess, RegisterEventHandler, TimerAction, SetEnvironmentVariable
 from launch.event_handlers import OnProcessExit, OnProcessStart
 from launch_ros.actions import Node
 import os
+import logging
+import sys
+
+# Disabilita i messaggi INFO del framework launch a livello globale
+logging.basicConfig(level=logging.CRITICAL, stream=sys.stdout)
+logging.getLogger('launch').setLevel(logging.CRITICAL)
+logging.getLogger('launch.launch_service').setLevel(logging.CRITICAL)
+logging.getLogger('launch_ros').setLevel(logging.CRITICAL)
 
 
 def generate_launch_description():
@@ -17,6 +25,12 @@ def generate_launch_description():
     rviz_config_file = os.path.join(workspace_dir, 'RvizConfig', 'spotConfig.rviz')
 
     # =========================
+    # 📝 LOG LEVEL ENV
+    # =========================
+    log_env = os.environ.copy()
+    log_env['ROS_LOG_LEVEL'] = 'warn'
+
+    # =========================
     # 🎥 CAMERA + DEPTH BRIDGE
     # =========================
     camera_bridge = ExecuteProcess(
@@ -24,72 +38,73 @@ def generate_launch_description():
             'ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
 
             # RGB
-            '/model/spot_sdk/camera/frontleft_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/frontright_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/left_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/right_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/back_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/frontleft_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/frontright_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/left_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/right_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/back_fisheye_image@sensor_msgs/msg/Image@gz.msgs.Image',
 
             # RGB CAMERA INFO
-            '/model/spot_sdk/camera/frontleft_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/frontright_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/left_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/right_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/back_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/frontleft_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/frontright_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/left_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/right_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/back_fisheye_image/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
 
             # DEPTH
-            '/model/spot_sdk/camera/frontleft_depth@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/frontright_depth@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/left_depth@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/right_depth@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/camera/back_depth@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/frontleft_depth@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/frontright_depth@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/left_depth@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/right_depth@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/camera/back_depth@sensor_msgs/msg/Image@gz.msgs.Image',
 
             # DEPTH CAMERA INFO
-            '/model/spot_sdk/camera/frontleft_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/frontright_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/left_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/right_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
-            '/model/spot_sdk/camera/back_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/frontleft_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/frontright_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/left_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/right_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/camera/back_depth/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
 
             # THERMAL
-            '/model/spot_sdk/thermal_camera@sensor_msgs/msg/Image@gz.msgs.Image',
-            '/model/spot_sdk/thermal_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
+            '/model/spot/thermal_camera@sensor_msgs/msg/Image@gz.msgs.Image',
+            '/model/spot/thermal_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo',
 
             '--ros-args',
 
             # REMAP RGB
-            '-r', '/model/spot_sdk/camera/frontleft_fisheye_image:=/spot_sdk/camera/frontleft/image_raw',
-            '-r', '/model/spot_sdk/camera/frontright_fisheye_image:=/spot_sdk/camera/frontright/image_raw',
-            '-r', '/model/spot_sdk/camera/left_fisheye_image:=/spot_sdk/camera/left/image_raw',
-            '-r', '/model/spot_sdk/camera/right_fisheye_image:=/spot_sdk/camera/right/image_raw',
-            '-r', '/model/spot_sdk/camera/back_fisheye_image:=/spot_sdk/camera/back/image_raw',
+            '-r', '/model/spot/camera/frontleft_fisheye_image:=/spot/camera/frontleft/image_raw',
+            '-r', '/model/spot/camera/frontright_fisheye_image:=/spot/camera/frontright/image_raw',
+            '-r', '/model/spot/camera/left_fisheye_image:=/spot/camera/left/image_raw',
+            '-r', '/model/spot/camera/right_fisheye_image:=/spot/camera/right/image_raw',
+            '-r', '/model/spot/camera/back_fisheye_image:=/spot/camera/back/image_raw',
 
             # REMAP RGB CAMERA INFO
-            '-r', '/model/spot_sdk/camera/frontleft_fisheye_image/camera_info:=/spot_sdk/camera/frontleft/camera_info',
-            '-r', '/model/spot_sdk/camera/frontright_fisheye_image/camera_info:=/spot_sdk/camera/frontright/camera_info',
-            '-r', '/model/spot_sdk/camera/left_fisheye_image/camera_info:=/spot_sdk/camera/left/camera_info',
-            '-r', '/model/spot_sdk/camera/right_fisheye_image/camera_info:=/spot_sdk/camera/right/camera_info',
-            '-r', '/model/spot_sdk/camera/back_fisheye_image/camera_info:=/spot_sdk/camera/back/camera_info',
+            '-r', '/model/spot/camera/frontleft_fisheye_image/camera_info:=/spot/camera/frontleft/camera_info',
+            '-r', '/model/spot/camera/frontright_fisheye_image/camera_info:=/spot/camera/frontright/camera_info',
+            '-r', '/model/spot/camera/left_fisheye_image/camera_info:=/spot/camera/left/camera_info',
+            '-r', '/model/spot/camera/right_fisheye_image/camera_info:=/spot/camera/right/camera_info',
+            '-r', '/model/spot/camera/back_fisheye_image/camera_info:=/spot/camera/back/camera_info',
 
             # REMAP DEPTH
-            '-r', '/model/spot_sdk/camera/frontleft_depth:=/spot_sdk/camera/frontleft/depth',
-            '-r', '/model/spot_sdk/camera/frontright_depth:=/spot_sdk/camera/frontright/depth',
-            '-r', '/model/spot_sdk/camera/left_depth:=/spot_sdk/camera/left/depth',
-            '-r', '/model/spot_sdk/camera/right_depth:=/spot_sdk/camera/right/depth',
-            '-r', '/model/spot_sdk/camera/back_depth:=/spot_sdk/camera/back/depth',
+            '-r', '/model/spot/camera/frontleft_depth:=/spot/camera/frontleft/depth',
+            '-r', '/model/spot/camera/frontright_depth:=/spot/camera/frontright/depth',
+            '-r', '/model/spot/camera/left_depth:=/spot/camera/left/depth',
+            '-r', '/model/spot/camera/right_depth:=/spot/camera/right/depth',
+            '-r', '/model/spot/camera/back_depth:=/spot/camera/back/depth',
 
             # REMAP DEPTH CAMERA INFO
-            '-r', '/model/spot_sdk/camera/frontleft_depth/camera_info:=/spot_sdk/camera/frontleft/depth/camera_info',
-            '-r', '/model/spot_sdk/camera/frontright_depth/camera_info:=/spot_sdk/camera/frontright/depth/camera_info',
-            '-r', '/model/spot_sdk/camera/left_depth/camera_info:=/spot_sdk/camera/left/depth/camera_info',
-            '-r', '/model/spot_sdk/camera/right_depth/camera_info:=/spot_sdk/camera/right/depth/camera_info',
-            '-r', '/model/spot_sdk/camera/back_depth/camera_info:=/spot_sdk/camera/back/depth/camera_info',
+            '-r', '/model/spot/camera/frontleft_depth/camera_info:=/spot/camera/frontleft/depth/camera_info',
+            '-r', '/model/spot/camera/frontright_depth/camera_info:=/spot/camera/frontright/depth/camera_info',
+            '-r', '/model/spot/camera/left_depth/camera_info:=/spot/camera/left/depth/camera_info',
+            '-r', '/model/spot/camera/right_depth/camera_info:=/spot/camera/right/depth/camera_info',
+            '-r', '/model/spot/camera/back_depth/camera_info:=/spot/camera/back/depth/camera_info',
 
             # REMAP THERMAL
-            '-r', '/model/spot_sdk/thermal_camera:=/spot_sdk/camera/thermal/image_raw',
-            '-r', '/model/spot_sdk/thermal_camera/camera_info:=/spot_sdk/camera/thermal/camera_info',
+            '-r', '/model/spot/thermal_camera:=/spot/camera/thermal/image_raw',
+            '-r', '/model/spot/thermal_camera/camera_info:=/spot/camera/thermal/camera_info',
         ],
-        output='screen'
+        output='screen',
+        env=log_env
     )
 
     # =========================
@@ -98,11 +113,12 @@ def generate_launch_description():
     lidar_bridge = ExecuteProcess(
         cmd=[
             'ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-            '/model/spot_sdk/lidar@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked',
+            '/model/spot/lidar@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked',
             '--ros-args',
-            '-r', '/model/spot_sdk/lidar:=/spot_sdk/lidar/points'
+            '-r', '/model/spot/lidar:=/spot/lidar/points'
         ],
-        output='screen'
+        output='screen',
+        env=log_env
     )
 
     # =========================
@@ -126,10 +142,11 @@ def generate_launch_description():
             'range_max': 10.0
         }],
         remappings=[
-            ('cloud_in', '/spot_sdk/lidar/points'),
-            ('scan', '/spot_sdk/lidar/scan')
+            ('cloud_in', '/spot/lidar/points'),
+            ('scan', '/spot/lidar/scan')
         ],
-        output='screen'
+        output='screen',
+        arguments=['--ros-args', '--log-level', 'warn']
     )
 
     # =========================
@@ -138,11 +155,12 @@ def generate_launch_description():
     imu_bridge = ExecuteProcess(
         cmd=[
             'ros2', 'run', 'ros_gz_bridge', 'parameter_bridge',
-            '/model/spot_sdk/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
+            '/model/spot/imu@sensor_msgs/msg/Imu@gz.msgs.IMU',
             '--ros-args',
-            '-r', '/model/spot_sdk/imu:=/spot_sdk/imu'
+            '-r', '/model/spot/imu:=/spot/imu'
         ],
-        output='screen'
+        output='screen',
+        env=log_env
     )
 
     # =========================
@@ -154,9 +172,9 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             name='tf_lidar',
-            arguments=['0','0','0','0','0','0',
+            arguments=['--ros-args', '--log-level', 'warn', '0','0','0','0','0','0',
                        'base_link',
-                       'spot_sdk/lidar']
+                       'spot/lidar']
         )]
     )
 
@@ -175,8 +193,9 @@ def generate_launch_description():
             'base_frame': 'base_link'
         }],
         remappings=[
-            ('scan', '/spot_sdk/lidar/scan')
-        ]
+            ('scan', '/spot/lidar/scan')
+        ],
+        arguments=['--ros-args', '--log-level', 'warn']
     )
 
     # =========================
@@ -189,7 +208,8 @@ def generate_launch_description():
             '-p', 'use_sim_time:=true'
         ],
         cwd=workspace_dir,
-        output='screen'
+        output='screen',
+        env=log_env
     )
 
     # =========================
@@ -199,7 +219,7 @@ def generate_launch_description():
         package='rviz2',
         executable='rviz2',
         name='rviz2',
-        arguments=['-d', rviz_config_file],
+        arguments=['-d', rviz_config_file, '--ros-args', '--log-level', 'warn'],
         parameters=[{'use_sim_time': True}],
         output='screen'
     )
@@ -216,7 +236,8 @@ def generate_launch_description():
             '-p', 'timeout_sec:=0.0'
         ],
         cwd=workspace_dir,
-        output='screen'
+        output='screen',
+        env=log_env
     )
 
     # =========================
@@ -247,6 +268,9 @@ def generate_launch_description():
     # 🚀 LAUNCH
     # =========================
     return LaunchDescription([
+
+        SetEnvironmentVariable('RCUTILS_LOG_STDOUT_FLAGS_CHANGED', 'true'),
+        SetEnvironmentVariable('RCUTILS_COLORIZED_OUTPUT', '0'),
 
         camera_bridge,
         lidar_bridge,

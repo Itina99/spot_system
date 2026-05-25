@@ -96,7 +96,7 @@ class ROSMovementProvider(MovementProvider):
     def rotate_by(self, dyaw: float) -> bool:
 
         try:
-            success = self.motion_controller.rotate_by(dyaw)
+            success, _ = self.motion_controller.relative_move(0, 0, dyaw)
             return success
         except Exception as e:
             print(f"[ROSMovementProvider] Error rotating: {e}")
@@ -105,7 +105,7 @@ class ROSMovementProvider(MovementProvider):
     def move_forward(self, distance: float) -> bool:
 
         try:
-            success = self.motion_controller.move_forward(distance)
+            success, _ = self.motion_controller.relative_move(distance, 0, 0)
             return success
         except Exception as e:
             print(f"[ROSMovementProvider] Error moving forward: {e}")
