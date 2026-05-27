@@ -12,7 +12,7 @@ def find_new_borders(env, robot_row, robot_col, path, frontier):
                 new_borders_cells.append(new_border)
     return new_borders_cells
 
-def find_best_point_in_cell(robot_x, robot_y, env, cell_row, cell_col, pts, cells_obstacle_dist):
+def find_best_point_in_cell(robot_x, robot_y, env, cell_row, cell_col, pts, cells_obstacle_dist, obstacle_threshold=0.15):
     """
     Sample 20 random points in a cell and find the one with clear path that is closest to cell center.
 
@@ -46,7 +46,7 @@ def find_best_point_in_cell(robot_x, robot_y, env, cell_row, cell_col, pts, cell
     # Check each sampled point
     for sample_x, sample_y in sampled_points:
         # Check if path is clear (obstacle_distance > 0 means outside obstacle)
-        if check_line_of_sight(robot_x, robot_y, sample_x, sample_y, pts, cells_obstacle_dist, obstacle_threshold=0.15):
+        if check_line_of_sight(robot_x, robot_y, sample_x, sample_y, pts, cells_obstacle_dist, obstacle_threshold=obstacle_threshold):
             valid_samples.append((sample_x, sample_y))
         else:
             rejected_samples.append((sample_x, sample_y))

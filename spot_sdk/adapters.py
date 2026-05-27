@@ -6,6 +6,7 @@ from typing import Tuple, Dict, Any, Optional, List
 import numpy as np
 import os
 import time
+import yaml
 
 from Core.robot_interface import (LocalGridProvider,StateProvider,MovementProvider,VisualizerProvider,RecordingProvider)
 
@@ -25,6 +26,10 @@ class SDKLocalGridProvider(LocalGridProvider):
     def __init__(self, robot_state_client, local_grid_client):
         self.robot_state_client = robot_state_client
         self.local_grid_client = local_grid_client
+        with open('client/config_sdk.yaml', 'r') as f:
+            self.config = yaml.safe_load(f)
+        self.obstacle_threshold = self.config['exploration']['obstacle_threshold']
+
 
     def get_obstacle_distance_grid(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """

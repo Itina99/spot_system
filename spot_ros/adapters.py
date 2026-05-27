@@ -1,5 +1,6 @@
 """ adapt ros to robot interface"""
 from typing import Dict, List, Tuple, Optional, Any
+import yaml
 
 from Core.robot_interface import (LocalGridProvider, StateProvider, MovementProvider, VisualizerProvider, RecordingProvider)
 import numpy as np
@@ -12,7 +13,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
 
 from spot_ros.obstacle_grid import ObstacleGrid
-from spot_ros import spot_utils_ros, nav_graph_utils_ros
+from spot_ros.rviz_visualization import RVizVisualizer
 
 class ROSLocalGridProvider(LocalGridProvider):
     def __init__(self, occupancy_grid_msg: Optional[OccupancyGrid] = None, occupied_threshold: int = 65):
@@ -20,6 +21,10 @@ class ROSLocalGridProvider(LocalGridProvider):
         self.occupancy_grid_msg = occupancy_grid_msg
         self.occupied_threshold = occupied_threshold
         self.obstacle_grid = None
+
+        with open('config/config_ros.yaml', 'r') as f:
+            self.config = yaml.safe_load(f)
+        self.obstacle_threshold = self.config['exploration']['obstacle_threshold']
 
         if occupancy_grid_msg is not None:
             self._update_grid(occupancy_grid_msg)
@@ -112,10 +117,48 @@ class ROSMovementProvider(MovementProvider):
             return False
 
 class ROSVisualizerProvider(VisualizerProvider):
-    def __init__(self):
-        pass
-    def visualize_iteration( self, pts: np.ndarray, cells_obstacle_dist: np.ndarray, robot_x: float, robot_y: float, candidates: Dict[str, List[Tuple[float, float]]], chosen_point: Optional[Tuple[float, float]], iteration: int, env: Any) -> None:
-        pass
+    def __init__(self, node: Node):
+        """
+        Initialize the ROS Visualizer Provider.
+
+        Args:
+            node: ROS 2 node with viz_pub publisher for markers
+        """
+        self.visualizer = RVizVisualizer(node)
+
+    def visualize_iteration(
+        self,
+        pts: np.ndarray,
+        cells_obstacle_dist: np.ndarray,
+        robot_x: float,
+        robot_y: float,
+        candidates: Dict[str, List[Tuple[float, float]]],
+        chosen_point: Optional[Tuple[float, float]],
+        iteration: int,
+        env: Any
+    ) -> None:
+        """
+        Visualize the exploration iteration in RViz.
+
+        Args:
+            pts: Points of obstacle grid
+            cells_obstacle_dist: Obstacle distance values
+            robot_x, robot_y: Robot position
+            candidates: Dict with 'valid' and 'rejected' lists
+            chosen_point: Selected waypoint or None
+            iteration: Current iteration number
+            env: Environment/map object
+        """
+        self.visualizer.visualize_grid_static(
+            pts=pts,
+            cells_obstacle_dist=cells_obstacle_dist,
+            robot_x=robot_x,
+            robot_y=robot_y,
+            candidates=candidates,
+            chosen_point=chosen_point,
+            iteration=iteration,
+            env=env
+        )
 
 class ROSRecordingProvider(RecordingProvider):
     def __init__(self, recording_interface, motion_controller, pose_state):

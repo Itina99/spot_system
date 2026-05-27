@@ -212,7 +212,7 @@ def main():
             'local_grid': ROSLocalGridProvider(occupancy_grid_msg=node.current_map, occupied_threshold=int(node.get_parameter('occupied_threshold').value)),
             'state': ROSStateProvider(pose_state=node.pose_state),
             'movement': ROSMovementProvider(motion_controller=node.motion),
-            'visualizer': ROSVisualizerProvider(),
+            'visualizer': ROSVisualizerProvider(node),
             'recording': ROSRecordingProvider(recording_interface=recording_interface, motion_controller=node.motion, pose_state=node.pose_state),
         }
 

@@ -26,11 +26,12 @@ def attempt_enter_cell_from_position(providers: Dict[str, Any], env: 'Environmen
 
     robot_x, robot_y,_ = state_provider.get_position()
     robot_yaw = state_provider.get_yaw()
+    obstacle_threshold = getattr(local_grid_provider, 'obstacle_threshold', 0.15)
 
     print(f"[INFO] Robot position: ({robot_x:.2f}, {robot_y:.2f})")
     print(f"[INFO] Sampling 20 random points in cell ({target_row},{target_col})...")
     target_x, target_y, valid_samples, rejected_samples = find_best_point_in_cell(
-        robot_x, robot_y, env, target_row, target_col, pts, cells_obstacle_dist
+        robot_x, robot_y, env, target_row, target_col, pts, cells_obstacle_dist, obstacle_threshold
     )
 
     if target_x is None or target_y is None:
