@@ -87,7 +87,6 @@ def attempt_enter_cell_from_position(providers: Dict[str, Any], env: 'Environmen
 
 def exploration_main_loop(providers: Dict[str, Any], env: EnvironmentMap, path: List[Tuple[int, int]]):
 
-
     state_provider = providers['state']
     recording = providers['recording']
 
