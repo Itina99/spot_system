@@ -161,7 +161,7 @@ class RVizVisualizer:
         - Reduced marker rebuild overhead
         
         Args:
-            pts: Points of obstacle grid [N, 3]
+            pts: Points of obstacle grid [N, 2] (x, y only)
             cells_obstacle_dist: Obstacle distance values [N]
             robot_x, robot_y: Robot position in world coordinates
             candidates: Dict with 'valid' and 'rejected' candidate lists
@@ -345,8 +345,8 @@ class RVizVisualizer:
             
             # Process each point in the grid
             for i in range(len(pts)):
-                wx, wy, wz = pts[i]
-                
+                wx, wy = pts[i]
+
                 # Filter by local radius
                 if (
                     abs(wx - robot_x) > self.LOCAL_RADIUS or

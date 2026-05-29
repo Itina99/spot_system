@@ -31,11 +31,6 @@ class LocalDistanceField:
             treat_unknown_as_obstacle=False,
         )
 
-    def update_from_occupancy_msg(self, msg):
-        """Update from /spot_sdk/local_grid ROS message (optional, for debugging)."""
-        # Can be called but grid is primarily static
-        pass
-
     def is_free(self, x, y, threshold=-0.1):
         """Check if point is in free space."""
         if self.obstacle_grid is None:

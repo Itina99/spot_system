@@ -114,14 +114,15 @@ class EasyWalkROSNode(Node):
             moving_angular_cap=float(self.get_parameter('moving_angular_cap').value),
         )
 
-        # Carica griglia statica da SDF se disponibile (backup per line-of-sight)
+        # Carica griglia statica da SDF (REQUIRED - non usa SLAM)
         try:
             static_cache = load_static_grid('worlds/test.sdf')
             self.local_distance = LocalDistanceField(static_cache)
-            self.get_logger().info('[EasyWalkROS] Static grid loaded from SDF')
+            self.get_logger().info('[EasyWalkROS] ✓ Static SDF grid loaded successfully')
         except Exception as e:
-            self.get_logger().warn(f'[EasyWalkROS] Static grid load failed (will use SLAM): {e}')
-            self.local_distance = None
+            error_msg = f'[EasyWalkROS] ✗ CRITICAL: Static SDF grid load failed! {e}'
+            self.get_logger().error(error_msg)
+            raise RuntimeError(error_msg)
 
     def wait_for_data(self, timeout=10.0):
         """Attendi che la mappa ROS sia disponibile"""
@@ -189,9 +190,7 @@ def main():
     node = EasyWalkROSNode()
 
     try:
-        if not node.wait_for_data():
-            node.get_logger().error('Timeout waiting for map')
-            return False
+        # Note: wait_for_data() is no longer needed since we use static SDF grid, not SLAM
         mission_folder, graph_folder, mission_log_file = folders_setup()
         env = environment_map.EnvironmentMap(rows=node.get_parameter('grid_rows').value, cols=node.get_parameter('grid_cols').value, cell_size=node.get_parameter('cell_size').value,)
 
@@ -208,8 +207,9 @@ def main():
 
         path = env.generate_serpentine_path(start_cell=env.start_cell)
 
+        # Create providers - local_grid uses ONLY static SDF, NOT SLAM
         providers = {
-            'local_grid': ROSLocalGridProvider(occupancy_grid_msg=node.current_map, occupied_threshold=int(node.get_parameter('occupied_threshold').value)),
+            'local_grid': ROSLocalGridProvider(local_distance=node.local_distance),
             'state': ROSStateProvider(pose_state=node.pose_state),
             'movement': ROSMovementProvider(motion_controller=node.motion),
             'visualizer': ROSVisualizerProvider(node),

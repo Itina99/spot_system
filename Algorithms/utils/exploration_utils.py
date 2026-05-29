@@ -12,17 +12,17 @@ def find_new_borders(env, robot_row, robot_col, path, frontier):
                 new_borders_cells.append(new_border)
     return new_borders_cells
 
-def find_best_point_in_cell(robot_x, robot_y, env, cell_row, cell_col, pts, cells_obstacle_dist, obstacle_threshold=0.15):
+def find_best_point_in_cell(robot_x, robot_y, env, cell_row, cell_col, pts, cells_obstacle_dist, obstacle_threshold=0.30):
     """
-    Sample 20 random points in a cell and find the one with clear path that is closest to cell center.
+    Sample random points in a cell and find the one with clear path that is closest to cell center.
 
     Args:
         robot_x, robot_y: Current robot position
         env: EnvironmentMap instance
         cell_row, cell_col: Target cell coordinates
-        pts: Grid points array from local grid
-        cells_obstacle_dist: Cell values from obstacle_distance grid
-                             (<=0 = inside obstacle, 0..0.33 = border, >=0.33 = free)
+        pts: Grid points array from local grid (from static SDF)
+        cells_obstacle_dist: Cell values from obstacle_distance grid (signed distance)
+                             (<=0 = inside obstacle, 0..0.30 = safety margin, >0.30 = free)
 
     Returns:
         tuple: (best_x, best_y, valid_samples, rejected_samples) or (None, None, [], []) if no valid point found

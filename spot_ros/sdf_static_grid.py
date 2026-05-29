@@ -152,7 +152,7 @@ def build_occupancy_grid(spec: GridSpec, obstacles: List[BoxObstacle]) -> Occupa
         for gy in range(y_start, y_end + 1):
             row = grid[gy]
             for gx in range(x_start, x_end + 1):
-                row[gx] = 100
+                row[gx] = 100 #standard ros for occupied cell in occupancy grid
 
     return OccupancyGrid(spec=spec, data=grid)
 

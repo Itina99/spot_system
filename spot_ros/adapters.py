@@ -14,10 +14,19 @@ from std_msgs.msg import ColorRGBA
 
 from spot_ros.obstacle_grid import ObstacleGrid
 from spot_ros.rviz_visualization import RVizVisualizer
+from spot_ros.local_distance import LocalDistanceField
 
 class ROSLocalGridProvider(LocalGridProvider):
-    def __init__(self, occupancy_grid_msg: Optional[OccupancyGrid] = None, occupied_threshold: int = 65):
+    def __init__(self, local_distance: Optional[LocalDistanceField] = None, occupancy_grid_msg: Optional[OccupancyGrid] = None, occupied_threshold: int = 65):
+        """
+        Initialize local grid provider using static SDF grid (not SLAM).
 
+        Args:
+            local_distance: LocalDistanceField instance from static SDF (REQUIRED)
+            occupancy_grid_msg: Ignored (kept for backward compatibility)
+            occupied_threshold: Ignored (kept for backward compatibility)
+        """
+        self.local_distance = local_distance
         self.occupancy_grid_msg = occupancy_grid_msg
         self.occupied_threshold = occupied_threshold
         self.obstacle_grid = None
@@ -26,27 +35,46 @@ class ROSLocalGridProvider(LocalGridProvider):
             self.config = yaml.safe_load(f)
         self.obstacle_threshold = self.config['exploration']['obstacle_threshold']
 
-        if occupancy_grid_msg is not None:
-            self._update_grid(occupancy_grid_msg)
+        # Initialize from static SDF grid (NOT from SLAM)
+        if local_distance is not None and local_distance.obstacle_grid is not None:
+            self.obstacle_grid = local_distance.obstacle_grid
+            print(f"\n{'='*70}")
+            print(f"[ROSLocalGridProvider] ✓ Initialized with STATIC SDF GRID ONLY")
+            print(f"  - No SLAM dependency")
+            print(f"  - Safety margin (obstacle_threshold): {self.obstacle_threshold}m")
+            print(f"  - Points < {self.obstacle_threshold}m from obstacles are blocked")
+            print(f"  - Grid dimensions: {self.obstacle_grid.spec.width}x{self.obstacle_grid.spec.height} cells")
+            print(f"  - Resolution: {self.obstacle_grid.spec.resolution:.4f} m/cell")
+            print(f"{'='*70}\n")
+        else:
+            error_msg = "[ROSLocalGridProvider] ✗ CRITICAL: No static SDF grid provided! Cannot proceed without it."
+            print(f"\n{'='*70}")
+            print(error_msg)
+            print(f"{'='*70}\n")
+            raise ValueError("local_distance parameter is required and must have a valid obstacle_grid")
 
     def update_grid(self, occupancy_grid_msg: OccupancyGrid):
-        self.occupancy_grid_msg = occupancy_grid_msg
-        self._update_grid(occupancy_grid_msg)
+        """Ignored - grid comes from static SDF only."""
+        print(f"[ROSLocalGridProvider] WARNING: update_grid() called but ignored (using static SDF grid only)")
+        pass
 
     def _update_grid(self, msg: OccupancyGrid):
-        try:
-            self.obstacle_grid = ObstacleGrid.from_occupancy_grid_msg(msg, occupied_threshold = self.occupied_threshold, treat_unknown_as_obstacle = False)
-
-        except Exception as e:
-            print(f"[ROSLocalGridProvider] Error converting grid: {e}")
-            self.obstacle_grid = None
-
+        """Ignored - grid comes from static SDF only."""
+        print(f"[ROSLocalGridProvider] WARNING: _update_grid() called but ignored (using static SDF grid only)")
+        pass
 
     def get_obstacle_distance_grid(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        # implementazione specifica per ROS
-        if self.obstacle_grid is None:
-            raise ValueError("No obstacle grid available. Call update_grid first.")
+        """
+        Get obstacle distance grid from static SDF (NOT from SLAM).
 
+        Returns:
+            tuple: (pts, cells, color) where:
+                - pts: Nx2 array of world positions
+                - cells: N array of signed distances (negative=obstacle, positive=free)
+                - color: Nx3 array of RGB colors (red=obstacle, blue=free)
+        """
+        if self.obstacle_grid is None:
+            raise ValueError("No obstacle grid available. Static SDF not loaded properly.")
 
         # Converti da ObstacleGrid a punti e celle
         pts, cells = self.obstacle_grid.to_points_and_cells()
@@ -55,10 +83,6 @@ class ROSLocalGridProvider(LocalGridProvider):
         color = np.zeros((len(cells), 3), dtype=np.uint8)
         color[:, 0] = (cells < 0.0) * 255  # Rosso per ostacoli
         color[:, 2] = (cells >= 0.0) * 255  # Blu per spazio libero
-
-        # Trasforma pts in 3D (z = 0 per grid 2D)
-        if pts.shape[1] == 2:
-            pts = np.column_stack([pts, np.zeros(len(pts))])
 
         return pts, cells, color
 
@@ -126,17 +150,7 @@ class ROSVisualizerProvider(VisualizerProvider):
         """
         self.visualizer = RVizVisualizer(node)
 
-    def visualize_iteration(
-        self,
-        pts: np.ndarray,
-        cells_obstacle_dist: np.ndarray,
-        robot_x: float,
-        robot_y: float,
-        candidates: Dict[str, List[Tuple[float, float]]],
-        chosen_point: Optional[Tuple[float, float]],
-        iteration: int,
-        env: Any
-    ) -> None:
+    def visualize_iteration( self, pts: np.ndarray, cells_obstacle_dist: np.ndarray, robot_x: float, robot_y: float, candidates: Dict[str, List[Tuple[float, float]]], chosen_point: Optional[Tuple[float, float]], iteration: int, env: Any) -> None:
         """
         Visualize the exploration iteration in RViz.
 
@@ -149,16 +163,7 @@ class ROSVisualizerProvider(VisualizerProvider):
             iteration: Current iteration number
             env: Environment/map object
         """
-        self.visualizer.visualize_grid_static(
-            pts=pts,
-            cells_obstacle_dist=cells_obstacle_dist,
-            robot_x=robot_x,
-            robot_y=robot_y,
-            candidates=candidates,
-            chosen_point=chosen_point,
-            iteration=iteration,
-            env=env
-        )
+        self.visualizer.visualize_grid_static(pts=pts, cells_obstacle_dist=cells_obstacle_dist, robot_x=robot_x, robot_y=robot_y, candidates=candidates, chosen_point=chosen_point, iteration=iteration, env=env)
 
 class ROSRecordingProvider(RecordingProvider):
     def __init__(self, recording_interface, motion_controller, pose_state):
