@@ -163,6 +163,7 @@ class ROSVisualizerProvider(VisualizerProvider):
             iteration: Current iteration number
             env: Environment/map object
         """
+        print("sta visualizzando")
         self.visualizer.visualize_grid_static(pts=pts, cells_obstacle_dist=cells_obstacle_dist, robot_x=robot_x, robot_y=robot_y, candidates=candidates, chosen_point=chosen_point, iteration=iteration, env=env)
 
 class ROSRecordingProvider(RecordingProvider):

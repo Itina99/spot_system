@@ -39,7 +39,7 @@ class EasyWalkROSNode(Node):
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
         self.declare_parameter('viz_topic', '/easy_walk/visualization')
         self.declare_parameter('viz_enabled', True)
-        self.declare_parameter('viz_local_radius', 8.0)
+        self.declare_parameter('viz_local_radius', 2.0)
         self.declare_parameter('grid_rows', 4)
         self.declare_parameter('grid_cols', 4)
         self.declare_parameter('cell_size', 2.0)
@@ -190,7 +190,15 @@ def main():
     node = EasyWalkROSNode()
 
     try:
-        # Note: wait_for_data() is no longer needed since we use static SDF grid, not SLAM
+        # ATTENDI IL PRIMO MESSAGGIO DI ODOMETRIA PRIMA DI LEGGERE LA POSIZIONE
+        node.get_logger().info('[main] Waiting for odometry data...')
+        start = time.time()
+        while node.pose_state.x == 0.0 and node.pose_state.y == 0.0:
+            rclpy.spin_once(node, timeout_sec=0.1)
+            if time.time() - start > 5.0:
+                node.get_logger().warn('[main] Timeout waiting for odometry!')
+                break
+
         mission_folder, graph_folder, mission_log_file = folders_setup()
         env = environment_map.EnvironmentMap(rows=node.get_parameter('grid_rows').value, cols=node.get_parameter('grid_cols').value, cell_size=node.get_parameter('cell_size').value,)
 

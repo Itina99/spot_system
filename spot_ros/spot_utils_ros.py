@@ -38,5 +38,4 @@ def getPosition(state: PoseState):
             self.y = qy
             self.z = qz
             self.w = qw
-
     return state.x, state.y, state.z, _Quat(state.qx, state.qy, state.qz, state.qw)
