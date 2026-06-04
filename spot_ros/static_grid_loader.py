@@ -47,7 +47,7 @@ def load_static_grid(sdf_path: str) -> StaticGridCache:
     obstacles = parse_sdf_obstacles(sdf_path, ignore)
     grid_range = calculate_grid_range(obstacles)
     spec = GridSpec(size=60, grid_range=grid_range)
-    grid = build_occupancy_grid(spec, obstacles)
+    grid = build_occupancy_grid(spec, obstacles, obstacle_padding=0.5)
     flat_data = [v for row in grid.data for v in row]
 
     return StaticGridCache(

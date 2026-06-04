@@ -136,11 +136,18 @@ def _world_to_grid(spec: GridSpec, x: float, y: float) -> Tuple[int, int]:
     return gx, gy
 
 
-def build_occupancy_grid(spec: GridSpec, obstacles: List[BoxObstacle]) -> OccupancyGrid:
+def build_occupancy_grid(spec: GridSpec, obstacles: List[BoxObstacle], obstacle_padding: float = 0.0) -> OccupancyGrid:
     grid = [[0 for _ in range(spec.size)] for _ in range(spec.size)]
 
     for obs in obstacles:
         min_x, max_x, min_y, max_y = obs.aabb()
+
+        # Apply padding to obstacles
+        min_x -= obstacle_padding
+        max_x += obstacle_padding
+        min_y -= obstacle_padding
+        max_y += obstacle_padding
+
         gx0, gy0 = _world_to_grid(spec, min_x, min_y)
         gx1, gy1 = _world_to_grid(spec, max_x, max_y)
 
@@ -209,6 +216,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sdf", default=_default_sdf_path(), help="Path to SDF world file")
     parser.add_argument("--grid-size", type=int, default=60, help="Grid size in cells (square)")
     parser.add_argument("--grid-range", type=float, default=3.0, help="World range (+/- meters)")
+    parser.add_argument("--obstacle-padding", type=float, default=0.0, help="Padding to expand obstacles (meters)")
     parser.add_argument("--ignore", default="ground_plane,spot", help="Comma-separated model names to ignore")
     parser.add_argument("--ascii", action="store_true", help="Print ASCII grid to stdout")
     parser.add_argument("--ascii-scale", type=int, default=1, help="Downsample factor for ASCII output")
@@ -239,7 +247,7 @@ def main() -> int:
     obstacles = parse_sdf_obstacles(args.sdf, ignore_names)
 
     spec = GridSpec(size=args.grid_size, grid_range=args.grid_range)
-    grid = build_occupancy_grid(spec, obstacles)
+    grid = build_occupancy_grid(spec, obstacles, obstacle_padding=args.obstacle_padding)
 
     print(f"Loaded obstacles: {len(obstacles)}")
     print(f"Grid size: {spec.size}x{spec.size}")
