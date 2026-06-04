@@ -176,7 +176,17 @@ class ROSRecordingProvider(RecordingProvider):
     def create_waypoint(self, cell_row: int, cell_col: int) -> bool:
 
         try:
-            response = self.recording_interface.create_default_waypoint(cell_row, cell_col)
+            # Get current robot position to assign real coordinates to waypoint
+            x, y, z = self.pose_state.x, self.pose_state.y, self.pose_state.z
+            yaw = self.pose_state.yaw()
+
+            response = self.recording_interface.create_default_waypoint(cell_row=cell_row, cell_col=cell_col, x=x, y=y, z=z, yaw=yaw )
+
+            if response:
+                wp_index = len(self.recording_interface.waypoints) - 1
+                print(f"[ROSRecordingProvider] ✓ Created waypoint wp_{wp_index} "
+                      f"at cell ({cell_row},{cell_col}) with position ({x:.2f}, {y:.2f}, {z:.2f})")
+
             return response is not False and response is not None
         except Exception as e:
             print(f"[ROSRecordingProvider] Error creating waypoint: {e}")
@@ -194,18 +204,42 @@ class ROSRecordingProvider(RecordingProvider):
 
         try:
             waypoints = self.get_all_waypoints()
-            nearest_cell= self.recording_interface.find_nearest_waypoint_cell_to_target(target_cell=target_cell, waypoints_by_cell=waypoints, env_map=env)
+            print(f"[ROSRecordingProvider] Available waypoints_by_cell: {waypoints.keys()}")
+            print(f"[ROSRecordingProvider] Target cell: {target_cell}")
+
+            nearest_cell = self.recording_interface.find_nearest_waypoint_cell_to_target( target_cell=target_cell, waypoints_by_cell=waypoints, env_map=env )
+
+            if nearest_cell is None:
+                print(f"[ROSRecordingProvider] WARNING: No waypoint found near target {target_cell}")
+            else:
+                wp_data = waypoints.get(nearest_cell)
+                if wp_data:
+                    print(f"[ROSRecordingProvider] ✓ Found nearest waypoint cell {nearest_cell} "
+                          f"-> {wp_data['name']} at ({wp_data['x']:.2f}, {wp_data['y']:.2f}, {wp_data['z']:.2f})")
+
             return nearest_cell if nearest_cell else None
         except Exception as e:
             print(f"[ROSRecordingProvider] Error finding nearest waypoint: {e}")
             return None
 
-    def get_manual_waypoint_by_cell(self, cell: Tuple[int, int]) -> Optional[Tuple[int, int]]:
+    def get_manual_waypoint_by_cell(self, cell: Tuple[int, int]) -> Optional[Dict]:
+
+        if cell is None:
+            print(f"[ROSRecordingProvider] WARNING: get_manual_waypoint_by_cell called with None")
+            return None
+
         try:
             waypoint = self.recording_interface.get_manual_waypoint_by_cell(cell[0], cell[1])
+
+            if waypoint:
+                print(f"[ROSRecordingProvider] ✓ Retrieved waypoint {waypoint['name']} for cell {cell} "
+                      f"at position ({waypoint['x']:.2f}, {waypoint['y']:.2f}, {waypoint['z']:.2f})")
+            else:
+                print(f"[ROSRecordingProvider] WARNING: No waypoint found for cell {cell}")
+
             return waypoint if waypoint else None
         except Exception as e:
-            print(f"[ROSRecordingProvider] Error getting waypoint: {e}")
+            print(f"[ROSRecordingProvider] Error getting waypoint for cell {cell}: {e}")
             return None
 
     def stop_recording(self) -> None:
