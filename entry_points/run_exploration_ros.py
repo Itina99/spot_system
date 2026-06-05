@@ -133,7 +133,6 @@ class EasyWalkROSNode(Node):
             rclpy.spin_once(self, timeout_sec=0.1)
         return False
 
-    # Callback per sottoscrizioni
     def _on_odom(self, msg: Odometry):
         """Callback per aggiornare la pose da odometria"""
         spot_utils_ros.update_pose_from_odom(self.pose_state, msg)
@@ -144,7 +143,6 @@ class EasyWalkROSNode(Node):
         self.current_map = msg
         self.map_frame = msg.header.frame_id.lstrip('/') or msg.header.frame_id
 
-    # Metodi helper per motion controller
     def _publish_cmd(self, cmd: Twist):
         """Pubblica comando di velocità"""
         self.cmd_pub.publish(cmd)
@@ -181,9 +179,32 @@ def folders_setup():
     return mission_folder, graph_folder, mission_log_file
 
 def end_mission(env, recording_interface, node):
-    """DA SISTEMARE L'END MISSION (identico a SDK)"""
-    pass
+    """
+    Procedura di fine missione per ROS exploration.
+    Implementa il ritorno a casa mediante loop closure sui waypoint.
+    """
+    print(f"\n{'=' * 70}")
+    print(f"[END_MISSION] Inizio procedura di fine missione")
+    print(f"{'=' * 70}")
 
+    # Ritorno a wp_0 usando il percorso ottimale
+    success = recording_interface.navigate_to_first_waypoint(
+        motion_controller=node.motion,
+        env_map=env,
+        max_retries=3,
+        timeout=30
+    )
+
+    if success:
+        print(f"\n{'=' * 70}")
+        print(f"✅ MISSIONE COMPLETATA - Robot tornato a casa!")
+        print(f"{'=' * 70}\n")
+        return True
+    else:
+        print(f"\n{'=' * 70}")
+        print(f"❌ MISSIONE - Errore nel ritorno a casa")
+        print(f"{'=' * 70}\n")
+        return False
 
 def main():
     rclpy.init()

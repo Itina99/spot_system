@@ -262,8 +262,3 @@ class ROSRecordingProvider(RecordingProvider):
         except Exception as e:
             print(f"[ROSRecordingProvider] Error navigating to waypoint: {e}")
             return False
-
-
-
-
-
