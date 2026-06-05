@@ -113,6 +113,7 @@ def exploration_main_loop(providers: Dict[str, Any], env: EnvironmentMap, path: 
             if any((f[0] == border[0] and f[1] == border[1]) for f in frontier):
                 borders_in_frontier.append(border)
 
+        print(f"[FRONTIER] Frontier elements: ({frontier})")
         if len(frontier) == 0:
             break
 
