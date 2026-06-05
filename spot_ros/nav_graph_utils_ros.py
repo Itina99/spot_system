@@ -14,12 +14,15 @@ class Waypoint:
     yaw: float
     cell_row: int | None = None
     cell_col: int | None = None
-
+    previous_waypoint: str | None = None
 
 class RecordingInterface:
     def __init__(self, *args, **kwargs):
         self.waypoints = []
         self._download_filepath = None
+        self.navigation_path = []  # [wp_0, wp_1, wp_2, ...]
+        self.waypoint_adjacency = {}  # {wp_0: [wp_1, wp_3], wp_1: [wp_0, wp_2], ...}
+
 
     def stop_recording(self, *args, **kwargs):
         return True
@@ -37,8 +40,24 @@ class RecordingInterface:
     def create_default_waypoint(self, cell_row=None, cell_col=None, x=0.0, y=0.0, z=0.0, yaw=0.0):
         ##### info sul robot sono passate come parametri ####
         name = f"wp_{len(self.waypoints)}"
-        wp = Waypoint(name=name, x=x, y=y, z=z, yaw=yaw, cell_row=cell_row, cell_col=cell_col)
+        if self.waypoints:
+            previous_wp_name = self.waypoints[-1].name
+            wp = Waypoint(
+                name=name,
+                x=x, y=y, z=z, yaw=yaw,
+                cell_row=cell_row, cell_col=cell_col,
+                previous_waypoint=previous_wp_name  # CHIAVE: memoria della provenienza
+            )
+
+            # Registra l'arco di navigazione
+            if previous_wp_name not in self.waypoint_adjacency:
+                self.waypoint_adjacency[previous_wp_name] = []
+            self.waypoint_adjacency[previous_wp_name].append(name)
+        else:
+            wp = Waypoint(name=name, x=x, y=y, z=z, yaw=yaw, cell_row=cell_row, cell_col=cell_col)
+            self.waypoint_adjacency[name] = []
         self.waypoints.append(wp)
+        self.navigation_path.append(name)
         return wp
 
     def get_recording_status(self, *args, **kwargs):
@@ -120,32 +139,34 @@ class RecordingInterface:
 
     def find_shortest_cell_path_bfs(self, start_cell, end_cell, env_map):
         """
-        Trova il percorso più corto tra due celle usando BFS.
-        Solo considera celle visitate (value = 1).
+        Trova il percorso più corto tra due celle sulla griglia statica.
+        Usa BFS considerando SOLO celle libere (ostacoli evitati).
 
         Args:
             start_cell: (row, col) della cella di partenza
             end_cell: (row, col) della cella di destinazione
-            env_map: EnvironmentMap instance
+            env_map: EnvironmentMap con griglia statica
 
         Returns:
-            list: Percorso di celle oppure None se non trovato
+            list: Percorso di celle [(r,c), ...] oppure None se non trovato
         """
         from collections import deque
 
-        print(f"\n[BFS] Ricerca percorso da {start_cell} a {end_cell}")
+        print(f"\n[BFS] Ricerca percorso libero da {start_cell} a {end_cell}")
 
         start_row, start_col = start_cell
         end_row, end_col = end_cell
 
-        if env_map.map[start_row][start_col] != 1:
-            print(f"[BFS] ✗ Cella inizio {start_cell} non visitata")
+        # Valida celle sulla griglia
+        if not (0 <= start_row < env_map.rows and 0 <= start_col < env_map.cols):
+            print(f"[BFS] ✗ Start cell {start_cell} fuori dalla griglia")
             return None
 
-        if env_map.map[end_row][end_col] != 1:
-            print(f"[BFS] ✗ Cella fine {end_cell} non visitata")
+        if not (0 <= end_row < env_map.rows and 0 <= end_col < env_map.cols):
+            print(f"[BFS] ✗ End cell {end_cell} fuori dalla griglia")
             return None
 
+        # BFS sulla griglia: naviga su celle libere (>= 0)
         queue = deque([(start_cell, [start_cell])])
         visited = {start_cell}
 
@@ -155,60 +176,88 @@ class RecordingInterface:
 
             if current_cell == end_cell:
                 print(f"[BFS] ✓ Percorso trovato: {len(path)} celle")
-                print(f"[BFS] Cammino: {' → '.join([f'({r},{c})' for r,c in path])}")
+                print(f"[BFS] Cammino: {' → '.join([f'({r},{c})' for r, c in path])}")
                 return path
 
+            # 4 vicini (N, E, S, W)
             neighbors = [
                 (current_row - 1, current_col),  # Nord
                 (current_row, current_col + 1),  # Est
                 (current_row + 1, current_col),  # Sud
-                (current_row, current_col - 1)   # Ovest
+                (current_row, current_col - 1)  # Ovest
             ]
 
             for next_row, next_col in neighbors:
-                if (0 <= next_row < env_map.rows and
-                    0 <= next_col < env_map.cols):
+                next_cell = (next_row, next_col)
 
-                    next_cell = (next_row, next_col)
+                # Verifica bounds
+                if not (0 <= next_row < env_map.rows and 0 <= next_col < env_map.cols):
+                    continue
 
-                    if (env_map.map[next_row][next_col] == 1 and
-                        next_cell not in visited):
+                # Naviga su celle libere (0) o visitate (1), evita ostacoli
+                cell_value = env_map.map[next_row][next_col]
 
-                        visited.add(next_cell)
-                        queue.append((next_cell, path + [next_cell]))
+                if cell_value >= 0 and next_cell not in visited:
+                    visited.add(next_cell)
+                    queue.append((next_cell, path + [next_cell]))
 
-        print(f"[BFS] ✗ Nessun percorso trovato")
+        print(f"[BFS] ✗ Nessun percorso libero trovato")
         return None
 
     def find_waypoints_for_path(self, cell_path):
         """
-        Converte un percorso di celle in una lista di waypoint.
-        Richiede che ogni cella nel percorso abbia un waypoint associato.
+        Converte un percorso di celle in waypoint names.
+        Se una cella non ha waypoint, prende il waypoint più vicino.
 
         Args:
-            cell_path: Lista di (row, col) del percorso
+            cell_path: Lista di (row, col)
 
         Returns:
-            list: Lista di waypoint names [wp_0, wp_1, ...] oppure None
+            list: Lista di waypoint names oppure None
         """
-        print(f"\n[WAYPOINT_MAPPING] Mapping celle → waypoint ({len(cell_path)} celle)")
+        if not cell_path:
+            print(f"[WAYPOINT_MAPPING] ✗ Path vuoto")
+            return None
 
-        # Crea mappa rapida celle → waypoint
-        cell_to_wp = {}
-        for wp in self.waypoints:
-            if wp.cell_row is not None and wp.cell_col is not None:
-                cell_to_wp[(wp.cell_row, wp.cell_col)] = wp.name
+        print(f"\n[WAYPOINT_MAPPING] Conversione {len(cell_path)} celle → waypoint")
 
         waypoint_path = []
-        for i, cell in enumerate(cell_path):
-            if cell in cell_to_wp:
-                waypoint_path.append(cell_to_wp[cell])
-                print(f"  [{i}] Cella {cell} → {cell_to_wp[cell]}")
-            else:
-                print(f"[WAYPOINT_MAPPING] ✗ Nessun waypoint per cella {cell}")
-                return None
 
-        print(f"[WAYPOINT_MAPPING] ✓ Percorso: {' → '.join(waypoint_path)}")
+        for i, cell in enumerate(cell_path):
+            cell_row, cell_col = cell
+
+            # Cerca waypoint esatto nella cella
+            wp_in_cell = None
+            for wp in self.waypoints:
+                if wp.cell_row == cell_row and wp.cell_col == cell_col:
+                    wp_in_cell = wp.name
+                    break
+
+            if wp_in_cell:
+                waypoint_path.append(wp_in_cell)
+                print(f"  [{i}] Cella {cell} → {wp_in_cell} (esatto)")
+            else:
+                # Nessun waypoint in questa cella, cerca il più vicino
+                best_wp = None
+                best_dist = float('inf')
+
+                for wp in self.waypoints:
+                    if wp.cell_row is None or wp.cell_col is None:
+                        continue
+
+                    dist = abs(wp.cell_row - cell_row) + abs(wp.cell_col - cell_col)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_wp = wp.name
+
+                if best_wp:
+                    waypoint_path.append(best_wp)
+                    print(f"  [{i}] Cella {cell} → {best_wp} (vicino, distanza={best_dist})")
+                else:
+                    print(f"[WAYPOINT_MAPPING] ✗ Nessun waypoint trovato per cella {cell}")
+                    return None
+
+        print(f"[WAYPOINT_MAPPING] ✓ Percorso waypoint: {' → '.join(waypoint_path)}")
         return waypoint_path
 
     def navigate_through_waypoint_path(self, waypoint_path, motion_controller, max_retries=3, timeout=30):
@@ -254,27 +303,27 @@ class RecordingInterface:
 
     def navigate_to_first_waypoint(self, motion_controller=None, env_map=None, max_retries=3, timeout=30):
         """
-        Ritorna al primo waypoint (wp_0) trovando il percorso ottimale.
-        MAIN ENTRY POINT per l'end mission in ROS.
+        Ritorna a wp_0 usando il percorso libero sulla griglia statica.
 
-        Orchestrazione completa:
-        1. Trova percorso BFS dalle celle visitate
-        2. Mappa celle a waypoint
-        3. Naviga sequenzialmente
+        Orchestrazione:
+        1. Trova cella di wp_0
+        2. Ricerca BFS su griglia statica per percorso libero
+        3. Converte celle in waypoint
+        4. Naviga sequenzialmente
 
         Args:
             motion_controller: Controller di movimento ROS
-            env_map: EnvironmentMap con griglia delle celle visitate
-            max_retries: Tentativi per ogni navigazione (default: 3)
-            timeout: Timeout per navigazione in secondi (default: 30)
+            env_map: EnvironmentMap con griglia statica
+            max_retries: Tentativi per ogni waypoint
+            timeout: Timeout per navigazione (secondi)
 
         Returns:
             bool: True se successo, False altrimenti
         """
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"[END_MISSION] Procedura di ritorno a casa")
         print(f"[END_MISSION] Obiettivo: wp_0 (punto di partenza)")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         # Validazione input
         if not self.waypoints:
@@ -291,37 +340,37 @@ class RecordingInterface:
 
         # Step 1: Determina celle di partenza e attuale
         first_wp = self.waypoints[0]
-        start_cell = (first_wp.cell_row, first_wp.cell_col)
+        home_cell = (first_wp.cell_row, first_wp.cell_col)
 
         last_wp = self.waypoints[-1]
         current_cell = (last_wp.cell_row, last_wp.cell_col)
 
-        print(f"[END_MISSION] 📍 Cella inizio: {start_cell} ({first_wp.name})")
+        print(f"[END_MISSION] 📍 Cella home: {home_cell} ({first_wp.name})")
         print(f"[END_MISSION] 📍 Cella attuale: {current_cell} ({last_wp.name})")
-        print(f"[END_MISSION] 📍 Waypoint totali registrati: {len(self.waypoints)}")
+        print(f"[END_MISSION] 📍 Waypoint totali: {len(self.waypoints)}")
 
         # Se già a casa
-        if current_cell == start_cell:
+        if current_cell == home_cell:
             print(f"[END_MISSION] ✓ Robot già a casa!")
             return True
 
-        # Step 2: BFS per trovare il percorso più corto
-        print(f"\n[END_MISSION] Step 1/3: Calcolo percorso ottimale...")
-        cell_path = self.find_shortest_cell_path_bfs(current_cell, start_cell, env_map)
+        # Step 2: Ricerca percorso libero sulla griglia statica
+        print(f"\n[END_MISSION] Step 1/3: Ricerca percorso libero sulla griglia...")
+        cell_path = self.find_shortest_cell_path_bfs(current_cell, home_cell, env_map)
 
         if cell_path is None:
-            print(f"[END_MISSION] ✗ Impossibile trovare percorso di ritorno")
+            print(f"[END_MISSION] ✗ Nessun percorso libero trovato sulla griglia")
             return False
 
-        # Step 3: Mappa celle a waypoint
-        print(f"\n[END_MISSION] Step 2/3: Mapping celle → waypoint...")
+        # Step 3: Converti celle in waypoint
+        print(f"\n[END_MISSION] Step 2/3: Conversione celle → waypoint...")
         waypoint_path = self.find_waypoints_for_path(cell_path)
 
         if waypoint_path is None:
-            print(f"[END_MISSION] ✗ Percorso celle non completamente mappabile a waypoint")
+            print(f"[END_MISSION] ✗ Impossibile convertire percorso in waypoint")
             return False
 
-        # Step 4: Naviga il percorso
+        # Step 4: Naviga sequenzialmente
         print(f"\n[END_MISSION] Step 3/3: Esecuzione navigazione...")
         success = self.navigate_through_waypoint_path(
             waypoint_path,
@@ -331,9 +380,9 @@ class RecordingInterface:
         )
 
         if success:
-            print(f"[END_MISSION] ✅ RITORNO A CASA COMPLETATO CON SUCCESSO!")
+            print(f"[END_MISSION] ✅ RITORNO A CASA COMPLETATO!")
         else:
-            print(f"[END_MISSION] ❌ Ritorno a casa fallito durante navigazione")
+            print(f"[END_MISSION] ❌ Ritorno a casa fallito")
 
         return success
 
