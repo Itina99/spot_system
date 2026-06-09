@@ -19,10 +19,11 @@ class Waypoint:
 class RecordingInterface:
     def __init__(self, *args, **kwargs):
         self.waypoints = []
+        self.waypoint_index = {}
+        self.current_waypoint_name = None
         self._download_filepath = None
         self.navigation_path = []  # [wp_0, wp_1, wp_2, ...]
         self.waypoint_adjacency = {}  # {wp_0: [wp_1, wp_3], wp_1: [wp_0, wp_2], ...}
-
 
     def stop_recording(self, *args, **kwargs):
         return True
@@ -40,24 +41,33 @@ class RecordingInterface:
     def create_default_waypoint(self, cell_row=None, cell_col=None, x=0.0, y=0.0, z=0.0, yaw=0.0):
         ##### info sul robot sono passate come parametri ####
         name = f"wp_{len(self.waypoints)}"
-        if self.waypoints:
-            previous_wp_name = self.waypoints[-1].name
-            wp = Waypoint(
-                name=name,
-                x=x, y=y, z=z, yaw=yaw,
-                cell_row=cell_row, cell_col=cell_col,
-                previous_waypoint=previous_wp_name  # CHIAVE: memoria della provenienza
-            )
+        if not self.waypoints:
+            wp = Waypoint(name=name,x=x, y=y, z=z, yaw=yaw,cell_row=cell_row, cell_col=cell_col)
 
-            # Registra l'arco di navigazione
+            self.waypoint_adjacency[name] = []
+        else:
+            previous_wp_name = self.current_waypoint_name
+            print(f"[GRAPH] Creating {name}" f" from {previous_wp_name}")
+            wp = Waypoint(name=name, x=x, y=y, z=z, yaw=yaw, cell_row=cell_row, cell_col=cell_col, previous_waypoint=previous_wp_name)
+            print(
+                f"[GRAPH DEBUG] current_waypoint_name = "
+                f"{self.current_waypoint_name}"
+            )
             if previous_wp_name not in self.waypoint_adjacency:
                 self.waypoint_adjacency[previous_wp_name] = []
+
+            if name not in self.waypoint_adjacency:
+                self.waypoint_adjacency[name] = []
+
+            # arco forward
             self.waypoint_adjacency[previous_wp_name].append(name)
-        else:
-            wp = Waypoint(name=name, x=x, y=y, z=z, yaw=yaw, cell_row=cell_row, cell_col=cell_col)
-            self.waypoint_adjacency[name] = []
+
+            # arco backward
+            self.waypoint_adjacency[name].append(previous_wp_name)
         self.waypoints.append(wp)
+        self.waypoint_index[wp.name] = wp
         self.navigation_path.append(name)
+        self.current_waypoint_name = name
         return wp
 
     def get_recording_status(self, *args, **kwargs):
@@ -111,10 +121,15 @@ class RecordingInterface:
             f"\n[NAV_ROS] Navigazione verso {target_waypoint.name} a ({target_waypoint.x:.2f}, {target_waypoint.y:.2f})...")
         for attempt in range(1, max_retries + 1):
             print(f"[NAV_ROS] Tentativo {attempt}/{max_retries}...")
+            print(
+                f"[NAV] Current waypoint = "
+                f"{self.current_waypoint_name}"
+            )
             try:
                 success = motion_controller.move_to(target_waypoint.x,target_waypoint.y,timeout=timeout)
                 if success:
                     print(f"[NAV_ROS] ✓ Arrived at {target_waypoint.name}")
+                    self.current_waypoint_name= waypoint_id
                     return True
                 else:
                     print(f"[NAV_ROS] Navigation failed, retry {attempt}/{max_retries}...")
@@ -204,61 +219,48 @@ class RecordingInterface:
         print(f"[BFS] ✗ Nessun percorso libero trovato")
         return None
 
-    def find_waypoints_for_path(self, cell_path):
+    def navigate_through_cell_path(self,cell_path,motion_controller,env_map, timeout=30):
         """
-        Converte un percorso di celle in waypoint names.
-        Se una cella non ha waypoint, prende il waypoint più vicino.
+        Segue direttamente il percorso BFS cella per cella.
 
         Args:
-            cell_path: Lista di (row, col)
+            cell_path: [(row,col), ...]
+            motion_controller: controller ROS
+            env_map: EnvironmentMap
+            timeout: timeout move_to
 
         Returns:
-            list: Lista di waypoint names oppure None
+            bool
         """
+
         if not cell_path:
-            print(f"[WAYPOINT_MAPPING] ✗ Path vuoto")
-            return None
+            print("[CELL_NAV] ✗ Percorso vuoto")
+            return False
 
-        print(f"\n[WAYPOINT_MAPPING] Conversione {len(cell_path)} celle → waypoint")
+        print(f"\n{'=' * 70}")
+        print(f"[CELL_NAV] Navigazione su {len(cell_path)} celle")
+        print(f"{'=' * 70}")
 
-        waypoint_path = []
+        #
+        # Saltiamo la prima cella
+        # perché è la cella in cui il robot si trova già
+        #
+        for idx, (row, col) in enumerate(cell_path[1:], start=1):
+            world_pos = env_map.get_world_position_from_cell(row, col)
+            if world_pos is None:
+                print(f"[CELL_NAV] ✗ Cella ({row},{col}) fuori mappa")
+                return False
+            target_x, target_y = world_pos
+            print(f"[CELL_NAV] [{idx}/{len(cell_path) - 1}] "
+                f"cella ({row},{col}) -> ({target_x:.2f}, {target_y:.2f})")
+            success = motion_controller.move_to(target_x,target_y,timeout=timeout)
 
-        for i, cell in enumerate(cell_path):
-            cell_row, cell_col = cell
+            if not success:
+                print(f"[CELL_NAV] ✗ Fallito raggiungimento "f"cella ({row},{col})")
+                return False
 
-            # Cerca waypoint esatto nella cella
-            wp_in_cell = None
-            for wp in self.waypoints:
-                if wp.cell_row == cell_row and wp.cell_col == cell_col:
-                    wp_in_cell = wp.name
-                    break
-
-            if wp_in_cell:
-                waypoint_path.append(wp_in_cell)
-                print(f"  [{i}] Cella {cell} → {wp_in_cell} (esatto)")
-            else:
-                # Nessun waypoint in questa cella, cerca il più vicino
-                best_wp = None
-                best_dist = float('inf')
-
-                for wp in self.waypoints:
-                    if wp.cell_row is None or wp.cell_col is None:
-                        continue
-
-                    dist = abs(wp.cell_row - cell_row) + abs(wp.cell_col - cell_col)
-                    if dist < best_dist:
-                        best_dist = dist
-                        best_wp = wp.name
-
-                if best_wp:
-                    waypoint_path.append(best_wp)
-                    print(f"  [{i}] Cella {cell} → {best_wp} (vicino, distanza={best_dist})")
-                else:
-                    print(f"[WAYPOINT_MAPPING] ✗ Nessun waypoint trovato per cella {cell}")
-                    return None
-
-        print(f"[WAYPOINT_MAPPING] ✓ Percorso waypoint: {' → '.join(waypoint_path)}")
-        return waypoint_path
+        print(f"[CELL_NAV] ✓ Percorso completato")
+        return True
 
     def navigate_through_waypoint_path(self, waypoint_path, motion_controller, max_retries=3, timeout=30):
         """
@@ -301,7 +303,7 @@ class RecordingInterface:
         print(f"{'='*70}\n")
         return True
 
-    def navigate_to_first_waypoint(self, motion_controller=None, env_map=None, max_retries=3, timeout=30):
+    def navigate_to_first_waypoint(self, current_pos = None, motion_controller=None, env_map=None, max_retries=3, timeout=30):
         """
         Ritorna a wp_0 usando il percorso libero sulla griglia statica.
 
@@ -319,6 +321,7 @@ class RecordingInterface:
 
         Returns:
             bool: True se successo, False altrimenti
+            :param current_pos:
         """
         print(f"\n{'=' * 70}")
         print(f"[END_MISSION] Procedura di ritorno a casa")
@@ -342,11 +345,10 @@ class RecordingInterface:
         first_wp = self.waypoints[0]
         home_cell = (first_wp.cell_row, first_wp.cell_col)
 
-        last_wp = self.waypoints[-1]
-        current_cell = (last_wp.cell_row, last_wp.cell_col)
+        current_cell = env_map.get_cell_from_world(current_pos[0], current_pos[1])
 
         print(f"[END_MISSION] 📍 Cella home: {home_cell} ({first_wp.name})")
-        print(f"[END_MISSION] 📍 Cella attuale: {current_cell} ({last_wp.name})")
+        print(f"[END_MISSION] 📍 Cella attuale: {current_cell}")
         print(f"[END_MISSION] 📍 Waypoint totali: {len(self.waypoints)}")
 
         # Se già a casa
@@ -355,29 +357,16 @@ class RecordingInterface:
             return True
 
         # Step 2: Ricerca percorso libero sulla griglia statica
-        print(f"\n[END_MISSION] Step 1/3: Ricerca percorso libero sulla griglia...")
+        print(f"\n[END_MISSION] Step 1/2: Ricerca percorso libero sulla griglia...")
         cell_path = self.find_shortest_cell_path_bfs(current_cell, home_cell, env_map)
 
         if cell_path is None:
             print(f"[END_MISSION] ✗ Nessun percorso libero trovato sulla griglia")
             return False
 
-        # Step 3: Converti celle in waypoint
-        print(f"\n[END_MISSION] Step 2/3: Conversione celle → waypoint...")
-        waypoint_path = self.find_waypoints_for_path(cell_path)
+        print(f"\n[END_MISSION] Step 2/2: Esecuzione percorso BFS...")
 
-        if waypoint_path is None:
-            print(f"[END_MISSION] ✗ Impossibile convertire percorso in waypoint")
-            return False
-
-        # Step 4: Naviga sequenzialmente
-        print(f"\n[END_MISSION] Step 3/3: Esecuzione navigazione...")
-        success = self.navigate_through_waypoint_path(
-            waypoint_path,
-            motion_controller,
-            max_retries=max_retries,
-            timeout=timeout
-        )
+        success = self.navigate_through_cell_path(cell_path,motion_controller,env_map,timeout=timeout)
 
         if success:
             print(f"[END_MISSION] ✅ RITORNO A CASA COMPLETATO!")
@@ -388,3 +377,42 @@ class RecordingInterface:
 
     def download_full_graph(self, *args, **kwargs):
         return self._download_filepath
+
+    def build_reverse_waypoint_path(self, start_waypoint_name, target_waypoint_name):
+
+        path = []
+        current_name = start_waypoint_name
+
+        while current_name is not None:
+            path.append(current_name)
+            if current_name == target_waypoint_name:
+                return path
+            wp = self.waypoint_index.get(current_name)
+            if wp is None:
+                return None
+            current_name = wp.previous_waypoint
+
+        return None
+
+    def backtrack_to_waypoint(self,target_waypoint_name,motion_controller,max_retries=3,timeout=30):
+        if not self.waypoints:
+            return False
+        current_waypoint = self.current_waypoint_name
+        path = self.build_reverse_waypoint_path(current_waypoint,target_waypoint_name)
+
+        if path is None:
+            print(
+                f"[BACKTRACK] impossibile raggiungere "
+                f"{target_waypoint_name}"
+            )
+            return False
+        success = self.navigate_through_waypoint_path(path,motion_controller,max_retries=max_retries,timeout=timeout)
+
+        if success:
+            self.current_waypoint_name = target_waypoint_name
+            print(
+                f"[BACKTRACK DEBUG] current waypoint updated to "
+                f"{self.current_waypoint_name}"
+            )
+
+        return success

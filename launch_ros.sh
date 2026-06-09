@@ -44,7 +44,7 @@ GAZEBO_CMD="
 source $ROS_SETUP && \
 source $WS_SETUP && \
 ros2 launch spot_bringup spot.gazebo.launch.py \
-world_file:=/home/spot/PycharmProjects/spot_system/worlds/test.sdf
+world_file:=/home/spot/PycharmProjects/spot_system/worlds/test2.sdf
 "
 
 echo "Avvio Gazebo..."

@@ -40,8 +40,8 @@ class EasyWalkROSNode(Node):
         self.declare_parameter('viz_topic', '/easy_walk/visualization')
         self.declare_parameter('viz_enabled', True)
         self.declare_parameter('viz_local_radius', 2.0)
-        self.declare_parameter('grid_rows', 4)
-        self.declare_parameter('grid_cols', 4)
+        self.declare_parameter('grid_rows', 8)
+        self.declare_parameter('grid_cols', 8)
         self.declare_parameter('cell_size', 2.0)
         self.declare_parameter('linear_speed', 0.35)
         self.declare_parameter('angular_speed', 0.45)
@@ -116,7 +116,7 @@ class EasyWalkROSNode(Node):
 
         # Carica griglia statica da SDF (REQUIRED - non usa SLAM)
         try:
-            static_cache = load_static_grid('worlds/test.sdf')
+            static_cache = load_static_grid('worlds/test2.sdf')
             self.local_distance = LocalDistanceField(static_cache)
             self.get_logger().info('[EasyWalkROS] ✓ Static SDF grid loaded successfully')
         except Exception as e:
@@ -187,8 +187,10 @@ def end_mission(env, recording_interface, node):
     print(f"[END_MISSION] Inizio procedura di fine missione")
     print(f"{'=' * 70}")
 
+    robot_pos = spot_utils_ros.getPosition(node.pose_state)
     # Ritorno a wp_0 usando il percorso ottimale
     success = recording_interface.navigate_to_first_waypoint(
+        current_pos=robot_pos,
         motion_controller=node.motion,
         env_map=env,
         max_retries=3,

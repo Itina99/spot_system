@@ -257,7 +257,8 @@ class ROSRecordingProvider(RecordingProvider):
 
     def navigate_to_waypoint(self, waypoint_id:Any) -> bool:
         try:
-            success = self.recording_interface.navigate_to_waypoint(waypoint_id, motion_controller=self.motion_controller)
+            print(f"[ROSRecordingProvider] Attempting to navigate to waypoint ID: {waypoint_id}")
+            success = self.recording_interface.backtrack_to_waypoint(waypoint_id, motion_controller=self.motion_controller)
             return success
         except Exception as e:
             print(f"[ROSRecordingProvider] Error navigating to waypoint: {e}")
