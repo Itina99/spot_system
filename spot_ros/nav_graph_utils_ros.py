@@ -4,7 +4,7 @@ These keep the EasyWalk flow running in simulation without GraphNav.
 """
 from dataclasses import dataclass
 import time
-
+import math
 @dataclass
 class Waypoint:
     name: str
@@ -146,8 +146,65 @@ class RecordingInterface:
         print(f"[NAV_ROS] ✗ Failed to reach waypoint after {max_retries} attempts")
         return False
 
-    def auto_close_loops(self, *args, **kwargs):
+    def can_connect_waypoints(self,wp_a,wp_b,obstacle_grid,safety_margin=0.40,samples_per_meter=10):
+        dx = wp_b.x - wp_a.x
+        dy = wp_b.y - wp_a.y
+        distance = math.hypot(dx, dy)
+        n_samples = max(2,int(distance * samples_per_meter))
+
+        for i in range(n_samples + 1):
+            t = i / n_samples
+            x = wp_a.x + t * dx
+            y = wp_a.y + t * dy
+            clearance = obstacle_grid.distance_at(x,y)
+            if clearance < safety_margin:
+                return False
         return True
+
+    def auto_close_loops(self,local_distance,max_connection_distance=4.0,safety_margin=0.40):
+
+        obstacle_grid = local_distance.obstacle_grid
+        added_edges = 0
+
+        print("\n[LOOP_CLOSURE] Ricerca nuove connessioni...")
+
+        for i in range(len(self.waypoints)):
+            wp_a = self.waypoints[i]
+            for j in range(i + 1, len(self.waypoints)):
+                wp_b = self.waypoints[j]
+                # evita vicini già collegati
+                if (
+                    wp_b.name
+                    in self.waypoint_adjacency.get(
+                        wp_a.name,
+                        []
+                    )
+                ):
+                    continue
+                distance = math.hypot( wp_a.x - wp_b.x, wp_a.y - wp_b.y)
+
+                if distance > max_connection_distance:
+                    continue
+
+                if not self.can_connect_waypoints(wp_a,wp_b,obstacle_grid,safety_margin=safety_margin):
+                    continue
+
+                self.waypoint_adjacency.setdefault(wp_a.name,[])
+                self.waypoint_adjacency.setdefault(wp_b.name,[])
+                self.waypoint_adjacency[wp_a.name].append(wp_b.name)
+                self.waypoint_adjacency[wp_b.name].append(wp_a.name)
+                added_edges += 1
+
+                print(
+                    f"[LOOP_CLOSURE] "
+                    f"{wp_a.name} <-> {wp_b.name} "
+                    f"(dist={distance:.2f})"
+                )
+        print(
+            f"[LOOP_CLOSURE] "
+            f"Aggiunti {added_edges} archi"
+        )
+        return added_edges
 
     def optimize_anchoring(self, *args, **kwargs):
         return True
@@ -328,6 +385,7 @@ class RecordingInterface:
         print(f"[END_MISSION] Obiettivo: wp_0 (punto di partenza)")
         print(f"{'=' * 70}")
 
+
         # Validazione input
         if not self.waypoints:
             print(f"[END_MISSION] ✗ Nessun waypoint registrato")
@@ -358,15 +416,13 @@ class RecordingInterface:
 
         # Step 2: Ricerca percorso libero sulla griglia statica
         print(f"\n[END_MISSION] Step 1/2: Ricerca percorso libero sulla griglia...")
-        cell_path = self.find_shortest_cell_path_bfs(current_cell, home_cell, env_map)
 
-        if cell_path is None:
-            print(f"[END_MISSION] ✗ Nessun percorso libero trovato sulla griglia")
+        current_wp = self.current_waypoint_name
+        path = self.find_waypoint_path(current_wp,"wp_0")
+        if path is None:
+            print("[END_MISSION] Nessun percorso sul grafo")
             return False
-
-        print(f"\n[END_MISSION] Step 2/2: Esecuzione percorso BFS...")
-
-        success = self.navigate_through_cell_path(cell_path,motion_controller,env_map,timeout=timeout)
+        success = self.navigate_through_waypoint_path(path,motion_controller,max_retries=max_retries,timeout=timeout)
 
         if success:
             print(f"[END_MISSION] ✅ RITORNO A CASA COMPLETATO!")
