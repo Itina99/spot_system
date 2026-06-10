@@ -116,7 +116,7 @@ class EasyWalkROSNode(Node):
 
         # Carica griglia statica da SDF (REQUIRED - non usa SLAM)
         try:
-            static_cache = load_static_grid('worlds/test2.sdf')
+            static_cache = load_static_grid('worlds/test.sdf')
             self.local_distance = LocalDistanceField(static_cache)
             self.get_logger().info('[EasyWalkROS] ✓ Static SDF grid loaded successfully')
         except Exception as e:

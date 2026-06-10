@@ -378,27 +378,45 @@ class RecordingInterface:
     def download_full_graph(self, *args, **kwargs):
         return self._download_filepath
 
-    def build_reverse_waypoint_path(self, start_waypoint_name, target_waypoint_name):
+    def find_waypoint_path(self, start_waypoint_name, target_waypoint_name):
+        from collections import deque
+        print(
+            f"\n[GRAPH_BFS] Ricerca percorso "
+            f"{start_waypoint_name} -> {target_waypoint_name}"
+        )
 
-        path = []
-        current_name = start_waypoint_name
+        if start_waypoint_name not in self.waypoint_adjacency:
+            print(f"[GRAPH_BFS] Start node non trovato")
+            return None
 
-        while current_name is not None:
-            path.append(current_name)
-            if current_name == target_waypoint_name:
+        if target_waypoint_name not in self.waypoint_adjacency:
+            print(f"[GRAPH_BFS] Target node non trovato")
+            return None
+        queue = deque()
+        queue.append((start_waypoint_name, [start_waypoint_name]))
+        visited = {start_waypoint_name}
+        while queue:
+            current_node, path = queue.popleft()
+            if current_node == target_waypoint_name:
+                print(
+                    f"[GRAPH_BFS] ✓ Path trovato: "
+                    f"{' -> '.join(path)}"
+                )
                 return path
-            wp = self.waypoint_index.get(current_name)
-            if wp is None:
-                return None
-            current_name = wp.previous_waypoint
-
+            neighbors = self.waypoint_adjacency.get(current_node,[])
+            for neighbor in neighbors:
+                if neighbor in visited:
+                    continue
+                visited.add(neighbor)
+                queue.append((neighbor,path + [neighbor]))
+        print("[GRAPH_BFS] ✗ Nessun percorso trovato")
         return None
 
     def backtrack_to_waypoint(self,target_waypoint_name,motion_controller,max_retries=3,timeout=30):
         if not self.waypoints:
             return False
         current_waypoint = self.current_waypoint_name
-        path = self.build_reverse_waypoint_path(current_waypoint,target_waypoint_name)
+        path = self.find_waypoint_path(current_waypoint,target_waypoint_name)
 
         if path is None:
             print(

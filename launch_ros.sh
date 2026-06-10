@@ -5,6 +5,13 @@ SESSION="spot_sim"
 ROS_SETUP="/opt/ros/humble/setup.bash"
 WS_SETUP="/home/spot/spot_sim_ws/install/setup.bash"
 
+LOG_DIR="/home/spot/PycharmProjects/spot_system/logs"
+
+mkdir -p "$LOG_DIR"
+
+RUN_ID=$(date +"%Y%m%d_%H%M%S")
+ALGO_LOG="$LOG_DIR/exploration_${RUN_ID}.log"
+
 cleanup() {
     echo ""
     echo "Pulizia processi..."
@@ -44,7 +51,7 @@ GAZEBO_CMD="
 source $ROS_SETUP && \
 source $WS_SETUP && \
 ros2 launch spot_bringup spot.gazebo.launch.py \
-world_file:=/home/spot/PycharmProjects/spot_system/worlds/test2.sdf
+world_file:=/home/spot/PycharmProjects/spot_system/worlds/test.sdf
 "
 
 echo "Avvio Gazebo..."
@@ -84,7 +91,7 @@ do
         ros2 node list 2>/dev/null | grep -E '(rviz|rviz2)'
     ")
 
-    if [ -n \"$RVIZ_FOUND\" ]; then
+    if [ -n "$RVIZ_FOUND" ]; then
         break
     fi
 
@@ -93,6 +100,11 @@ done
 
 echo "RViz rilevato."
 
+echo ""
+echo "Log algoritmo:"
+echo "$ALGO_LOG"
+echo ""
+
 ALGO_CMD="
 source $ROS_SETUP && \
 source $WS_SETUP && \
@@ -100,7 +112,8 @@ cd /home/spot/PycharmProjects/spot_system && \
 python3 -m entry_points.run_exploration_ros \
 --ros-args \
 -p odom_topic:=/spot/odometry \
--p use_sim_time:=true
+-p use_sim_time:=true \
+2>&1 | tee '$ALGO_LOG'
 "
 
 echo "Avvio algoritmo..."
@@ -114,6 +127,9 @@ tmux select-layout -t "$SESSION" tiled
 echo ""
 echo "======================================================"
 echo "Sistema avviato"
+echo ""
+echo "Log algoritmo:"
+echo "$ALGO_LOG"
 echo ""
 echo "Comandi utili:"
 echo ""
